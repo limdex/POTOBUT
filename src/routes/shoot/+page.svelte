@@ -30,6 +30,18 @@
 	let previewSrc = $state<string | null>(null);
 	let previewTimer: ReturnType<typeof setInterval> | undefined;
 
+	async function refreshPreview() {
+		try {
+			const res = await fetch(`/api/camera/preview?t=${Date.now()}`, { cache: 'no-store' });
+			if (!res.ok) return;
+			const blob = await res.blob();
+			if (previewSrc) URL.revokeObjectURL(previewSrc);
+			previewSrc = URL.createObjectURL(blob);
+		} catch {
+			// ignore
+		}
+	}
+
 	function startCountdown() {
 		phase = 'countdown';
 		countdown = 5;
@@ -91,10 +103,8 @@
 			cameraConnected = status.connected;
 			if (status.connected) {
 				console.log('[SHOOT] Starting live preview');
-				previewSrc = `/api/camera/preview?t=${Date.now()}`;
-				previewTimer = setInterval(() => {
-					previewSrc = `/api/camera/preview?t=${Date.now()}`;
-				}, 2000);
+				refreshPreview();
+				previewTimer = setInterval(refreshPreview, 2000);
 			} else {
 				console.log('[SHOOT] Camera not connected, using placeholders');
 			}
@@ -106,6 +116,7 @@
 	onDestroy(() => {
 		if (timerId) clearTimeout(timerId);
 		if (previewTimer) clearInterval(previewTimer);
+		if (previewSrc) URL.revokeObjectURL(previewSrc);
 	});
 </script>
 

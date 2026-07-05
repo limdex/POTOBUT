@@ -110,14 +110,20 @@ export class WindowsCameraDriver implements CameraDriver {
 
 	private async captureFrame(): Promise<ArrayBuffer | null> {
 		if (!this._deviceName) return null;
-		const framePath = join(tmpdir(), 'potobut-capture.jpg');
+		const framePath = join(tmpdir(), `potobut-${Date.now()}.jpg`);
 
 		try {
-			execSync(`ffmpeg -y -f dshow -i video="${this._deviceName}" -frames:v 1 -q:v 2 "${framePath}" 2>nul`, { timeout: 10000 });
+			execSync(`ffmpeg -y -fflags nobuffer -flags low_delay -probesize 32 -analyzeduration 0 -f dshow -rtbufsize 64M -i video="${this._deviceName}" -frames:v 1 -q:v 2 "${framePath}" 2>nul`, { timeout: 10000 });
 			const buf = readFileSync(framePath);
 			return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
 		} catch {
-			return null;
+			try {
+				execSync(`ffmpeg -y -f dshow -i video="${this._deviceName}" -frames:v 1 -q:v 2 "${framePath}" 2>nul`, { timeout: 10000 });
+				const buf = readFileSync(framePath);
+				return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+			} catch {
+				return null;
+			}
 		}
 	}
 }
