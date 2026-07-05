@@ -8,9 +8,16 @@ export const GET: RequestHandler = async () => {
 	return json(status);
 };
 
-export const POST: RequestHandler = async () => {
-	console.log('[PRINTER] Connecting...');
-	const result = await connectPrinter();
+export const POST: RequestHandler = async ({ request }) => {
+	let name: string | undefined;
+	try {
+		const body = await request.json();
+		name = body.name;
+	} catch {
+		// no body, use auto-select
+	}
+	console.log('[PRINTER] Connecting to:', name || '(auto)');
+	const result = await connectPrinter(name);
 	console.log('[PRINTER] Connect result:', result);
 	return json(result);
 };

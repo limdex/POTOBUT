@@ -38,8 +38,11 @@ export async function connectPrinter(name?: string): Promise<PrinterInfo> {
 			_printer.connected = true;
 			_printer.name = name;
 		} else if (printers.length > 0) {
+			// Skip virtual printers, prefer real hardware
+			const virtual = ['xps', 'pdf', 'fax', 'onenote', 'microsoft print', 'microsoft xps'];
+			const real = printers.find(p => !virtual.some(v => p.toLowerCase().includes(v)));
 			_printer.connected = true;
-			_printer.name = printers[0];
+			_printer.name = real || printers[0];
 		} else {
 			_printer.connected = false;
 			_printer.name = undefined;
