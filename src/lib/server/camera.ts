@@ -2,6 +2,7 @@ import type { CameraDriver } from './camera/driver';
 import { Gphoto2Driver } from './camera/gphoto2';
 import { WebcamDriver } from './camera/webcam';
 import { GoProDriver } from './camera/gopro';
+import { WindowsCameraDriver } from './camera/windows';
 
 export interface CameraInfo {
 	connected: boolean;
@@ -11,6 +12,7 @@ export interface CameraInfo {
 }
 
 const drivers: CameraDriver[] = [
+	new WindowsCameraDriver(),
 	new Gphoto2Driver(),
 	new WebcamDriver(),
 	new GoProDriver()

@@ -9,6 +9,24 @@ export class WebcamDriver implements CameraDriver {
 	private _device?: string;
 
 	async detect(): Promise<boolean> {
+		if (process.platform === 'win32') {
+			try {
+				const out = execSync('ffmpeg -hide_banner -list_devices true -f dshow -i dummy 2>&1', { timeout: 8000 }).toString();
+				const lines = out.split('\n');
+				for (const line of lines) {
+					const trimmed = line.trim();
+					const match = trimmed.match(/"([^"]+)"/);
+					if (match) {
+						this._device = match[1];
+						return true;
+					}
+				}
+				return false;
+			} catch {
+				return false;
+			}
+		}
+
 		try {
 			const out = execSync('fswebcam --list-controls 2>&1 || v4l2-ctl --list-devices 2>&1', { timeout: 5000 }).toString();
 			if (out.includes('/dev/video') || out.includes('device')) {
@@ -17,15 +35,8 @@ export class WebcamDriver implements CameraDriver {
 			}
 			return false;
 		} catch {
-			try {
-				const out = execSync('ffmpeg -hide_banner -list_devices true -f dshow -i dummy 2>&1', { timeout: 5000 }).toString();
-				if (out.includes('"')) {
-					return true;
-				}
-				return false;
-			} catch {
-				return false;
-			}
+			// ffmpeg fallback for non-Windows
+			return false;
 		}
 	}
 
