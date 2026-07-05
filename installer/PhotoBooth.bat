@@ -1,6 +1,6 @@
 @echo off
-REM PhotoBooth Launcher
-REM This script starts the PhotoBooth application
+REM PhotoBooth Dev Launcher
+REM Clones repo, installs dependencies, runs dev server
 
 setlocal
 
@@ -22,30 +22,42 @@ if not exist "%NODE_EXE%" (
 
 REM Set environment variables
 set "PATH=%NODE_DIR%;%PATH%"
-set "NODE_ENV=production"
+set "NODE_ENV=development"
 
-REM Create user data directory if it doesn't exist
-set "DATA_DIR=%LOCALAPPDATA%\PhotoBooth"
-if not exist "%DATA_DIR%" mkdir "%DATA_DIR%"
-if not exist "%DATA_DIR%\photos" mkdir "%DATA_DIR%\photos"
-if not exist "%DATA_DIR%\logs" mkdir "%DATA_DIR%\logs"
+REM Set project directory
+set "PROJECT_DIR=%APP_DIR%potobut"
 
-REM Change to app directory
-cd /d "%APP_DIR%"
-
-REM Start the server
-echo Starting PhotoBooth...
-echo.
-
-REM Try to start with node directly
-if exist "%APP_DIR%index.js" (
-    start "" http://localhost:5173
-    "%NODE_EXE%" index.js
-) else (
-    echo Error: Application not built properly.
-    echo Please run build-installer.ps1 first.
-    pause
-    exit /b 1
+REM Check if project exists, if not clone it
+if not exist "%PROJECT_DIR%" (
+    echo Cloning PhotoBooth repository...
+    git clone https://github.com/limdex/POTOBUT.git "%PROJECT_DIR%"
+    if %errorlevel% neq 0 (
+        echo Error: Failed to clone repository.
+        echo Please check your internet connection.
+        pause
+        exit /b 1
+    )
 )
 
-endlocal
+REM Change to project directory
+cd /d "%PROJECT_DIR%"
+
+REM Install dependencies if node_modules doesn't exist
+if not exist "node_modules" (
+    echo Installing dependencies...
+    call "%NPM_CMD%" install
+    if %errorlevel% neq 0 (
+        echo Error: Failed to install dependencies.
+        pause
+        exit /b 1
+    )
+)
+
+REM Start dev server
+echo Starting PhotoBooth dev server...
+echo.
+echo Open browser to: http://localhost:5173
+echo.
+call "%NPM_CMD%" run dev
+
+pause
