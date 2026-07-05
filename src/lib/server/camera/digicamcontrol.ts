@@ -102,19 +102,33 @@ export class DigiCamControlDriver implements CameraDriver {
 	}
 
 	async detect(): Promise<boolean> {
-		const res = await this.api('status');
-		if (!res) {
-			console.log('[CAMERA] digiCamControl not reachable');
+		try {
+			const resp = await fetch(DIGICAM_URL, { signal: AbortSignal.timeout(3000) });
+			if (!resp.ok) {
+				console.log('[CAMERA] digiCamControl root responded with status', resp.status);
+				return false;
+			}
+		} catch (e) {
+			console.log('[CAMERA] digiCamControl not reachable at', DIGICAM_URL, '-', e instanceof Error ? e.message : e);
 			return false;
 		}
+		console.log('[CAMERA] digiCamControl web server is running');
 
-		const lower = res.toLowerCase();
-		const hasCamera = lower.includes('canon') || lower.includes('eos') ||
-			lower.includes('nikon') || lower.includes('sony') ||
-			lower.includes('camera') || lower.includes('model');
-		if (!hasCamera) {
-			console.log('[CAMERA] digiCamControl running but no camera detected');
-			return false;
+		// Check camera status
+		const res = await this.api('status');
+		if (res) {
+			console.log('[CAMERA] digiCamControl status response:', res.substring(0, 200));
+			const lower = res.toLowerCase();
+			const hasCamera = lower.includes('canon') || lower.includes('eos') ||
+				lower.includes('nikon') || lower.includes('sony') ||
+				lower.includes('camera') || lower.includes('model') ||
+				lower.includes('ok');
+			if (!hasCamera) {
+				console.log('[CAMERA] digiCamControl running but no camera detected in status');
+				return true;
+			}
+		} else {
+			console.log('[CAMERA] digiCamControl status endpoint returned nothing');
 		}
 
 		this._imageDir = getDigiCamSessionDir();
