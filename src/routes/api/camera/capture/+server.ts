@@ -8,7 +8,7 @@ export const POST: RequestHandler = async () => {
 		console.log('[CAMERA] Capture failed: no photo captured');
 		return new Response('No photo captured', { status: 503 });
 	}
-	console.log('[CAMERA] Capture success, size:', buf.length, 'bytes');
+	console.log('[CAMERA] Capture success, size:', buf.byteLength, 'bytes');
 	return new Response(buf, {
 		headers: {
 			'Content-Type': 'image/jpeg',
