@@ -1,12 +1,16 @@
 import Database from 'better-sqlite3';
 import { dev } from '$app/environment';
+import { existsSync, mkdirSync } from 'fs';
+import { dirname } from 'path';
 
-const DB_PATH = dev ? 'database/potobut.db' : '/data/potobut.db';
+const DB_PATH = dev ? 'database/potobut.db' : 'data/potobut.db';
 
 let db: Database.Database;
 
 export function getDb(): Database.Database {
 	if (!db) {
+		const dir = dirname(DB_PATH);
+		if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 		db = new Database(DB_PATH);
 		db.pragma('journal_mode = WAL');
 		db.pragma('foreign_keys = ON');
