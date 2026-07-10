@@ -23,18 +23,14 @@ function killOrphans(): void {
 
 const GPHOTO_ENV = { ...process.env, MSYS_NO_PATHCONV: '1' } as Record<string, string>;
 
-const SOI = Buffer.from([0xFF, 0xD8]);
-const EOI = Buffer.from([0xFF, 0xD9]);
-
 export class Gphoto2Driver implements CameraDriver {
 	readonly name = 'gphoto2 (Canon/Nikon/Sony DSLR)';
 	private _port?: string;
 	private _model?: string;
 	private _streamProcess: ChildProcess | null = null;
 	private _streaming = false;
-	private _streamBuf = Buffer.alloc(0);
 	private _latestFrame: Buffer | null = null;
-	private _streamLogCount = 0;
+	private _frameLogCount = 0;
 	private _photoPath = join(tmpdir(), 'potobut-photo.jpg');
 	private _photoPathMsys = toMsysPath(join(tmpdir(), 'potobut-photo.jpg'));
 
@@ -82,82 +78,71 @@ export class Gphoto2Driver implements CameraDriver {
 	private startStream(): void {
 		if (this._streaming) return;
 		this._streaming = true;
-		this._streamBuf = Buffer.alloc(0);
 		this._latestFrame = null;
-		this._streamLogCount = 0;
+		this._frameLogCount = 0;
 
-		const proc = spawn('gphoto2', [
-			'--capture-movie=999999',
-			'--stdout',
-			'--quiet'
-		], {
-			stdio: ['ignore', 'pipe', 'pipe'],
-			windowsHide: true,
-			env: GPHOTO_ENV
-		});
-
-		this._streamProcess = proc;
-
-		proc.stdout?.on('data', (chunk: Buffer) => {
-			this._streamBuf = Buffer.concat([this._streamBuf, chunk]);
-			this._processStreamBuf();
-		});
-
-		let stderrBuf = '';
-		proc.stderr?.on('data', (data: Buffer) => {
-			stderrBuf += data.toString();
-		});
-
-		proc.on('error', (e) => {
-			console.log('[CAMERA] Stream process error:', e.message);
-			this._streamProcess = null;
-			if (this._streaming) {
-				setTimeout(() => {
-					if (this._streaming) this.startStream();
-				}, 1000);
-			}
-		});
-
-		proc.on('exit', (code) => {
-			this._streamProcess = null;
+		const runFrame = () => {
 			if (!this._streaming) return;
 
-			if (this._streamLogCount < 3) {
-				console.log('[CAMERA] Stream exited code', code, stderrBuf.trim() ? `stderr: ${stderrBuf.trim()}` : '');
-				this._streamLogCount++;
-			}
-			setTimeout(() => {
-				if (this._streaming) this.startStream();
-			}, 1000);
-		});
+			const proc = spawn('gphoto2', [
+				'--capture-movie=1',
+				'--stdout',
+				'--quiet'
+			], {
+				stdio: ['ignore', 'pipe', 'pipe'],
+				windowsHide: true,
+				env: GPHOTO_ENV
+			});
 
+			this._streamProcess = proc;
+
+			const chunks: Buffer[] = [];
+			proc.stdout?.on('data', (chunk: Buffer) => {
+				chunks.push(chunk);
+			});
+
+			let stderrBuf = '';
+			proc.stderr?.on('data', (data: Buffer) => {
+				stderrBuf += data.toString();
+			});
+
+			proc.on('error', (e) => {
+				console.log('[CAMERA] Frame process error:', e.message);
+				this._streamProcess = null;
+				if (this._streaming) {
+					setTimeout(runFrame, 1000);
+				}
+			});
+
+			proc.on('exit', (code) => {
+				this._streamProcess = null;
+				if (!this._streaming) return;
+
+				if (code === 0) {
+					const frame = Buffer.concat(chunks);
+					if (frame.length > 500) {
+						this._latestFrame = frame;
+						if (this._frameLogCount < 2) {
+							console.log('[CAMERA] Frame captured OK, size:', frame.length, 'bytes');
+							this._frameLogCount++;
+						}
+					} else if (this._frameLogCount < 3) {
+						console.log('[CAMERA] Frame too small:', frame.length, 'bytes');
+						this._frameLogCount++;
+					}
+					runFrame();
+				} else {
+					if (this._frameLogCount < 3) {
+						console.log('[CAMERA] Frame exit code', code, stderrBuf.trim() ? `stderr: ${stderrBuf.trim()}` : '(no stderr)');
+						this._frameLogCount++;
+					}
+					setTimeout(runFrame, 1000);
+				}
+			});
+		};
+
+		runFrame();
 		console.log('[CAMERA] Live view stream started');
-	}
-
-	private _processStreamBuf(): void {
-		while (this._streamBuf.length > 0) {
-			const soiIdx = this._streamBuf.indexOf(SOI);
-			if (soiIdx === -1) {
-				if (this._streamBuf.length > 500000) {
-					this._streamBuf = Buffer.alloc(0);
-				}
-				return;
-			}
-
-			const eoiIdx = this._streamBuf.indexOf(EOI, soiIdx + 2);
-			if (eoiIdx === -1) {
-				if (soiIdx > 0) {
-					this._streamBuf = this._streamBuf.subarray(soiIdx);
-				}
-				if (this._streamBuf.length > 1000000) {
-					this._streamBuf = Buffer.alloc(0);
-				}
-				return;
-			}
-
-			this._latestFrame = Buffer.from(this._streamBuf.subarray(soiIdx, eoiIdx + 2));
-			this._streamBuf = this._streamBuf.subarray(eoiIdx + 2);
-		}
 	}
 
 	private stopStream(): Promise<void> {
