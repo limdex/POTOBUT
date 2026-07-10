@@ -1,86 +1,26 @@
-import { execSync } from 'child_process';
-import { readFileSync } from 'fs';
+import { execSync, spawn, type ChildProcess } from 'child_process';
+import { existsSync, statSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import type { CameraDriver } from './driver';
 
 export class WindowsCameraDriver implements CameraDriver {
-	readonly name = 'Windows Camera (WMI)';
+	readonly name = 'Windows Camera (DirectShow)';
 	private _deviceName?: string;
+	private _ffmpeg: ChildProcess | null = null;
+	private _streamPath = '';
+	private _connected = false;
 
 	async detect(): Promise<boolean> {
 		if (process.platform !== 'win32') return false;
 
-		// Try wmic first (most reliable on Windows)
-		try {
-			const out = execSync('wmic path Win32_PnPEntity where "PNPClass=\'Camera\' or PNPClass=\'Image\' or PNPClass=\'WPD\'" get Name /format:value 2>&1', { timeout: 5000 }).toString();
-			const lines = out.split('\n').filter(l => l.trim());
-			for (const line of lines) {
-				const match = line.match(/^Name=(.+)/);
-				if (match) {
-					const name = match[1].trim();
-					if (name && name !== 'null') {
-						console.log('[CAMERA] Found via wmic:', name);
-						this._deviceName = name;
-						return true;
-					}
-				}
-			}
-		} catch (e) {
-			console.log('[CAMERA] wmic failed:', e instanceof Error ? e.message : e);
-		}
-
-		// Try wmic with broader search (any Canon/EOS/camera device)
-		try {
-			const out = execSync('wmic path Win32_PnPEntity where "Name like \'%canon%\' or Name like \'%eos%\' or Name like \'%camera%\' or Name like \'%digital camera%\'" get Name /format:value 2>&1', { timeout: 5000 }).toString();
-			const lines = out.split('\n').filter(l => l.trim());
-			for (const line of lines) {
-				const match = line.match(/^Name=(.+)/);
-				if (match) {
-					const name = match[1].trim();
-					if (name && name !== 'null') {
-						console.log('[CAMERA] Found via wmic (name search):', name);
-						this._deviceName = name;
-						return true;
-					}
-				}
-			}
-		} catch (e) {
-			console.log('[CAMERA] wmic name search failed:', e instanceof Error ? e.message : e);
-		}
-
-		// Fallback: PowerShell WMI
-		try {
-			const ps = execSync('powershell -NoProfile -Command "Get-PnpDevice | Where-Object { $_.Class -eq \'Camera\' -or $_.Class -eq \'Image\' -or $_.Class -eq \'WPD\' -or $_.Class -eq \'PortableDevices\' } | Select-Object -First 1 -ExpandProperty FriendlyName" 2>&1', { timeout: 5000 }).toString().trim();
-			if (ps && ps !== 'null' && ps !== '') {
-				console.log('[CAMERA] Found via PowerShell:', ps);
-				this._deviceName = ps;
-				return true;
-			}
-		} catch (e) {
-			console.log('[CAMERA] PowerShell failed:', e instanceof Error ? e.message : e);
-		}
-
-		// Fallback: check for any Canon/EOS device via PowerShell
-		try {
-			const ps = execSync('powershell -NoProfile -Command "Get-PnpDevice | Where-Object { $_.FriendlyName -like \'*canon*\' -or $_.FriendlyName -like \'*eos*\' -or $_.FriendlyName -like \'*camera*\' } | Select-Object -First 1 -ExpandProperty FriendlyName" 2>&1', { timeout: 5000 }).toString().trim();
-			if (ps && ps !== 'null' && ps !== '') {
-				console.log('[CAMERA] Found via PowerShell (name):', ps);
-				this._deviceName = ps;
-				return true;
-			}
-		} catch (e) {
-			console.log('[CAMERA] PowerShell name search failed:', e instanceof Error ? e.message : e);
-		}
-
-		// Fallback: DirectShow via ffmpeg
 		try {
 			const out = execSync('ffmpeg -hide_banner -list_devices true -f dshow -i dummy 2>&1', { timeout: 8000 }).toString();
 			const lines = out.split('\n');
 			for (const line of lines) {
-				const match = line.match(/"([^"]+)"/);
+				const match = line.trim().match(/"([^"]+)"/);
 				if (match) {
-					console.log('[CAMERA] Found via DirectShow:', match[1]);
+					console.log('[CAMERA] Found DirectShow device:', match[1]);
 					this._deviceName = match[1];
 					return true;
 				}
@@ -89,41 +29,97 @@ export class WindowsCameraDriver implements CameraDriver {
 			// ffmpeg not installed
 		}
 
+		try {
+			const out = execSync('wmic path Win32_PnPEntity where "PNPClass=\'Camera\' or PNPClass=\'Image\'" get Name /format:value 2>&1', { timeout: 5000 }).toString();
+			const lines = out.split('\n').filter(l => l.trim());
+			for (const line of lines) {
+				const match = line.match(/^Name=(.+)/);
+				if (match && match[1].trim() !== 'null') {
+					console.log('[CAMERA] Found via WMI:', match[1].trim());
+					this._deviceName = match[1].trim();
+					return true;
+				}
+			}
+		} catch {
+			// WMI not available
+		}
+
 		return false;
 	}
 
+	private _startFfmpeg(): void {
+		if (!this._deviceName || !this._streamPath) return;
+		this._ffmpeg = spawn('ffmpeg', [
+			'-y', '-fflags', 'nobuffer',
+			'-f', 'dshow',
+			'-rtbufsize', '32M',
+			'-i', `video=${this._deviceName}`,
+			'-vf', 'fps=15',
+			'-q:v', '5',
+			'-f', 'image2',
+			'-update', '1',
+			this._streamPath
+		], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+
+		this._ffmpeg.stderr?.on('data', () => {});
+		this._ffmpeg.on('error', (e) => console.log('[CAMERA] ffmpeg error:', e.message));
+		this._ffmpeg.on('exit', () => {
+			this._ffmpeg = null;
+			if (this._connected) {
+				setTimeout(() => this._startFfmpeg(), 1000);
+			}
+		});
+	}
+
 	async connect(): Promise<boolean> {
-		return this._deviceName !== undefined;
+		if (!this._deviceName) return false;
+
+		this._streamPath = join(tmpdir(), 'potobut-live.jpg');
+
+		try {
+			this._startFfmpeg();
+			await new Promise<void>((resolve, reject) => {
+				const check = setInterval(() => {
+					if (existsSync(this._streamPath) && statSync(this._streamPath).size > 1000) {
+						clearInterval(check);
+						resolve();
+					}
+				}, 200);
+				setTimeout(() => { clearInterval(check); reject(new Error('timeout')); }, 8000);
+			});
+
+			console.log('[CAMERA] Live stream started');
+			this._connected = true;
+			return true;
+		} catch (e) {
+			console.log('[CAMERA] Failed to start live stream:', e instanceof Error ? e.message : e);
+			this._ffmpeg?.kill();
+			this._ffmpeg = null;
+			return false;
+		}
 	}
 
 	async disconnect(): Promise<void> {
-		this._deviceName = undefined;
+		this._connected = false;
+		if (this._ffmpeg) {
+			this._ffmpeg.kill('SIGTERM');
+			this._ffmpeg = null;
+		}
 	}
 
 	async capturePreview(): Promise<ArrayBuffer | null> {
-		return this.captureFrame();
+		if (!this._streamPath || !this._connected) return null;
+		try {
+			const { readFile } = await import('fs/promises');
+			const buf = await readFile(this._streamPath);
+			if (buf.length < 100) return null;
+			return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+		} catch {
+			return null;
+		}
 	}
 
 	async capturePhoto(): Promise<ArrayBuffer | null> {
-		return this.captureFrame();
-	}
-
-	private async captureFrame(): Promise<ArrayBuffer | null> {
-		if (!this._deviceName) return null;
-		const framePath = join(tmpdir(), `potobut-${Date.now()}.jpg`);
-
-		try {
-			execSync(`ffmpeg -y -fflags nobuffer -flags low_delay -probesize 32 -analyzeduration 0 -f dshow -rtbufsize 64M -i video="${this._deviceName}" -frames:v 1 -q:v 2 "${framePath}" 2>nul`, { timeout: 10000 });
-			const buf = readFileSync(framePath);
-			return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
-		} catch {
-			try {
-				execSync(`ffmpeg -y -f dshow -i video="${this._deviceName}" -frames:v 1 -q:v 2 "${framePath}" 2>nul`, { timeout: 10000 });
-				const buf = readFileSync(framePath);
-				return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
-			} catch {
-				return null;
-			}
-		}
+		return this.capturePreview();
 	}
 }

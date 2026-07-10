@@ -28,5 +28,5 @@ export interface TemplateRecord {
 	updated_at: string;
 }
 
-export const SLOT_WIDTH = 400;
-export const SLOT_HEIGHT = 500;
+export const SLOT_WIDTH = 500;
+export const SLOT_HEIGHT = 400;

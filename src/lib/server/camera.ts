@@ -1,9 +1,8 @@
 import type { CameraDriver } from './camera/driver';
 import { Gphoto2Driver } from './camera/gphoto2';
+import { WindowsCameraDriver } from './camera/windows';
 import { WebcamDriver } from './camera/webcam';
 import { GoProDriver } from './camera/gopro';
-import { WindowsCameraDriver } from './camera/windows';
-import { DigiCamControlDriver } from './camera/digicamcontrol';
 
 export interface CameraInfo {
 	connected: boolean;
@@ -13,15 +12,15 @@ export interface CameraInfo {
 }
 
 const drivers: CameraDriver[] = [
-	new DigiCamControlDriver(),
-	new WindowsCameraDriver(),
 	new Gphoto2Driver(),
+	new WindowsCameraDriver(),
 	new WebcamDriver(),
 	new GoProDriver()
 ];
 
 let _activeDriver: CameraDriver | null = null;
 let _info: CameraInfo = { connected: false };
+let _capturing = false;
 
 export function getCameraStatus(): CameraInfo {
 	return { ..._info };
@@ -55,9 +54,9 @@ export async function connectCamera(): Promise<CameraInfo> {
 	return getCameraStatus();
 }
 
-export function disconnectCamera(): CameraInfo {
+export async function disconnectCamera(): Promise<CameraInfo> {
 	if (_activeDriver) {
-		_activeDriver.disconnect();
+		await _activeDriver.disconnect();
 		_activeDriver = null;
 	}
 	_info = { connected: false };
@@ -71,5 +70,14 @@ export async function capturePreview(): Promise<ArrayBuffer | null> {
 
 export async function capturePhoto(): Promise<ArrayBuffer | null> {
 	if (!_activeDriver || !_info.connected) return null;
-	return _activeDriver.capturePhoto();
+	if (_capturing) {
+		console.log('[CAMERA] Capture already in progress, skipping');
+		return null;
+	}
+	_capturing = true;
+	try {
+		return await _activeDriver.capturePhoto();
+	} finally {
+		_capturing = false;
+	}
 }

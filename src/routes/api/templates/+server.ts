@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { getDb } from '$lib/server/db';
+import { getDb, invalidateTemplateCache } from '$lib/server/db';
 import type { RequestHandler } from './$types';
 import type { Slot, Overlay } from '$lib/data/admin-types';
 
@@ -42,6 +42,7 @@ export const POST: RequestHandler = async ({ request }) => {
 	);
 
 	const row = db.prepare('SELECT * FROM templates WHERE id = ?').get(result.lastInsertRowid) as any;
+	invalidateTemplateCache(Number(result.lastInsertRowid));
 	return json({
 		...row,
 		slots: JSON.parse(row.slots),

@@ -6,6 +6,9 @@ import { dirname } from 'path';
 const DB_PATH = dev ? 'database/potobut.db' : 'data/potobut.db';
 
 let db: Database.Database;
+let _schemaInit = false;
+
+const _templateCache = new Map<number, any>();
 
 export function getDb(): Database.Database {
 	if (!db) {
@@ -14,7 +17,10 @@ export function getDb(): Database.Database {
 		db = new Database(DB_PATH);
 		db.pragma('journal_mode = WAL');
 		db.pragma('foreign_keys = ON');
-		initSchema();
+		if (!_schemaInit) {
+			initSchema();
+			_schemaInit = true;
+		}
 	}
 	return db;
 }
@@ -34,4 +40,26 @@ function initSchema() {
 			updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 		)
 	`);
+}
+
+export function getParsedTemplate(id: number) {
+	if (_templateCache.has(id)) return _templateCache.get(id);
+	const db = getDb();
+	const row = db.prepare('SELECT * FROM templates WHERE id = ?').get(id) as any;
+	if (!row) return null;
+	const parsed = {
+		...row,
+		slots: JSON.parse(row.slots || '[]'),
+		overlays: JSON.parse(row.overlays || '[]')
+	};
+	_templateCache.set(id, parsed);
+	return parsed;
+}
+
+export function invalidateTemplateCache(id?: number) {
+	if (id !== undefined) {
+		_templateCache.delete(id);
+	} else {
+		_templateCache.clear();
+	}
 }

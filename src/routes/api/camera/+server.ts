@@ -17,7 +17,7 @@ export const POST: RequestHandler = async () => {
 
 export const DELETE: RequestHandler = async () => {
 	console.log('[CAMERA] Disconnecting...');
-	const result = disconnectCamera();
+	const result = await disconnectCamera();
 	console.log('[CAMERA] Disconnect result:', result);
 	return json(result);
 };

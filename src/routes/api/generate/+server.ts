@@ -1,30 +1,31 @@
 import { error } from '@sveltejs/kit';
 import sharp from 'sharp';
-import { getDb } from '$lib/server/db';
+import { getParsedTemplate } from '$lib/server/db';
 import fs from 'fs';
 import path from 'path';
 
 export async function POST({ request }) {
-	const { templateId, photos } = await request.json();
+	const { templateId, photos, transforms } = await request.json();
 
-	const db = getDb();
-	const row = db.prepare('SELECT * FROM templates WHERE id = ?').get(Number(templateId)) as any;
-	if (!row) error(400, 'Template not found');
+	const template = getParsedTemplate(Number(templateId));
+	if (!template) error(400, 'Template not found');
 	if (!photos?.length) error(400, 'No photos');
-
-	const template = {
-		...row,
-		slots: JSON.parse(row.slots || '[]'),
-		overlays: JSON.parse(row.overlays || '[]')
-	};
-
-	const bgPath = path.resolve('static', template.background_path.replace(/^\//, ''));
-	const bgBuffer = fs.readFileSync(bgPath);
 
 	const tw = template.canvas_width;
 	const th = template.canvas_height;
 
-	const pad = 0.03;
+	let bgBuffer: Buffer;
+	if (template.background_path) {
+		const bgPath = path.resolve('static', template.background_path.replace(/^\//, ''));
+		if (fs.existsSync(bgPath)) {
+			bgBuffer = fs.readFileSync(bgPath);
+		} else {
+			bgBuffer = await sharp({ create: { width: tw, height: th, channels: 3, background: { r: 0, g: 0, b: 0 } } }).png().toBuffer();
+		}
+	} else {
+		bgBuffer = await sharp({ create: { width: tw, height: th, channels: 3, background: { r: 0, g: 0, b: 0 } } }).png().toBuffer();
+	}
+
 	const layers: { input: Buffer; top: number; left: number }[] = [];
 
 	for (let i = 0; i < template.slots.length; i++) {
@@ -32,23 +33,31 @@ export async function POST({ request }) {
 		const photoData = photos[i]?.data;
 		if (!photoData) continue;
 
-		const px = Math.round(slot.x + slot.width * pad);
-		const py = Math.round(slot.y + slot.height * pad);
-		const pw = Math.round(slot.width * (1 - pad * 2));
-		const ph = Math.round(slot.height * (1 - pad * 2));
+		const t = (transforms && transforms[i]) || { scale: 1, offsetX: 0, offsetY: 0 };
+		const scale = Math.max(1, Math.min(3, t.scale || 1));
 
 		const photoBuffer = Buffer.from(photoData.split(',')[1], 'base64');
 
-		const resized = await sharp(photoBuffer)
-			.resize({ width: pw, height: ph, fit: 'inside', withoutEnlargement: false })
+		const scaledW = Math.round(slot.width * scale);
+		const scaledH = Math.round(slot.height * scale);
+
+		const maxOffX = (scaledW - slot.width) / 2;
+		const maxOffY = (scaledH - slot.height) / 2;
+		const offX = Math.max(-maxOffX, Math.min(maxOffX, t.offsetX || 0));
+		const offY = Math.max(-maxOffY, Math.min(maxOffY, t.offsetY || 0));
+
+		const rawLeft = Math.round(scaledW / 2 - slot.width / 2 - offX);
+		const rawTop = Math.round(scaledH / 2 - slot.height / 2 - offY);
+		const left = Math.max(0, Math.min(rawLeft, scaledW - slot.width));
+		const top = Math.max(0, Math.min(rawTop, scaledH - slot.height));
+
+		const extracted = await sharp(photoBuffer)
+			.resize({ width: scaledW, height: scaledH, fit: 'cover' })
+			.extract({ left, top, width: Math.round(slot.width), height: Math.round(slot.height) })
 			.png()
 			.toBuffer();
 
-		const rmeta = await sharp(resized).metadata();
-		const ox = Math.round(px + (pw - rmeta.width!) / 2);
-		const oy = Math.round(py + (ph - rmeta.height!) / 2);
-
-		layers.push({ input: resized, top: oy, left: ox });
+		layers.push({ input: extracted, top: Math.round(slot.y), left: Math.round(slot.x) });
 	}
 
 	for (const ov of template.overlays) {
@@ -71,7 +80,7 @@ export async function POST({ request }) {
 		create: { width: tw, height: th, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } }
 	})
 		.composite([{ input: bg, top: 0, left: 0 }, ...layers])
-		.png({ compressionLevel: 9 })
+		.png({ compressionLevel: 3 })
 		.toBuffer();
 
 	return new Response(new Uint8Array(result).buffer.slice(0), {

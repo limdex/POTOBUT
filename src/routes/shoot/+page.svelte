@@ -29,16 +29,21 @@
 	let cameraConnected = $state(false);
 	let previewSrc = $state<string | null>(null);
 	let previewTimer: ReturnType<typeof setInterval> | undefined;
+	let polling = false;
 
 	async function refreshPreview() {
+		if (polling) return;
+		polling = true;
 		try {
-			const res = await fetch(`/api/camera/preview?t=${Date.now()}`, { cache: 'no-store' });
+			const res = await fetch(`/api/camera/preview?t=${Date.now()}`);
 			if (!res.ok) return;
 			const blob = await res.blob();
 			if (previewSrc) URL.revokeObjectURL(previewSrc);
 			previewSrc = URL.createObjectURL(blob);
 		} catch {
 			// ignore
+		} finally {
+			polling = false;
 		}
 	}
 
@@ -104,7 +109,7 @@
 			if (status.connected) {
 				console.log('[SHOOT] Starting live preview');
 				refreshPreview();
-				previewTimer = setInterval(refreshPreview, 2000);
+				previewTimer = setInterval(refreshPreview, 200);
 			} else {
 				console.log('[SHOOT] Camera not connected, using placeholders');
 			}
@@ -162,15 +167,15 @@
 				<button class="btn" onclick={() => goto(`/review?template=${template?.id}`)}>Lihat Hasil</button>
 			</div>
 		{/if}
+	</div>
 
-		<div class="strip">
-			{#each shootState.capturedPhotos as photo (photo.id)}
-				<img src={photo.data} alt="Shot {photo.id}" class="thumb" />
-			{/each}
-			{#each Array((template?.slot_count ?? 0) - shootState.capturedPhotos.length) as _, i}
-				<div class="thumb empty"></div>
-			{/each}
-		</div>
+	<div class="strip">
+		{#each shootState.capturedPhotos as photo (photo.id)}
+			<img src={photo.data} alt="Shot {photo.id}" class="thumb" />
+		{/each}
+		{#each Array((template?.slot_count ?? 0) - shootState.capturedPhotos.length) as _, i}
+			<div class="thumb empty"></div>
+		{/each}
 	</div>
 </div>
 
@@ -179,6 +184,9 @@
 		display: flex;
 		flex-direction: column;
 		min-height: 100dvh;
+		padding: 100px;
+		background: #000;
+		position: relative;
 	}
 	.viewfinder {
 		flex: 1;
@@ -196,6 +204,7 @@
 		width: 100%;
 		height: 100%;
 		object-fit: cover;
+		z-index: 0;
 	}
 	.flash-overlay {
 		position: absolute;
@@ -209,6 +218,8 @@
 		100% { opacity: 0; }
 	}
 	.viewfinder-content {
+		position: relative;
+		z-index: 1;
 		text-align: center;
 		color: #fff;
 	}
@@ -254,23 +265,21 @@
 	.btn:hover { opacity: 0.9; }
 	.strip {
 		position: absolute;
-		bottom: 0;
-		left: 0;
-		right: 0;
+		bottom: 8px;
+		left: 8px;
+		right: 8px;
 		display: flex;
 		justify-content: center;
-		gap: 0.5rem;
-		padding: 0.75rem;
-		overflow-x: auto;
+		gap: 0.4rem;
 		pointer-events: none;
 	}
 	.thumb {
-		width: 160px;
-		height: 120px;
-		border-radius: 8px;
+		width: 120px;
+		height: 90px;
+		border-radius: 6px;
 		object-fit: cover;
-		flex-shrink: 0;
 		pointer-events: auto;
+		flex-shrink: 0;
 	}
 	.thumb.empty {
 		background: rgba(55, 65, 81, 0.5);

@@ -60,8 +60,8 @@ export function disconnectPrinter(): PrinterInfo {
 	return getPrinterStatus();
 }
 
-export async function printImage(imageBuffer: Buffer): Promise<boolean> {
-	if (!_printer.connected || !_printer.name) return false;
+export async function printImage(imageBuffer: Buffer): Promise<{ ok: boolean; error?: string }> {
+	if (!_printer.connected || !_printer.name) return { ok: false, error: 'Printer not connected' };
 
 	const tempPath = join(tmpdir(), 'potobut-print.png');
 	const psPath = join(tmpdir(), 'potobut-print.ps1');
@@ -76,7 +76,16 @@ Add-Type -AssemblyName System.Drawing
 $img = [System.Drawing.Image]::FromFile('${escapedPath}')
 $doc = New-Object System.Drawing.Printing.PrintDocument
 $doc.PrinterSettings.PrinterName = '${escapedName}'
-$doc.add_PrintPage({ param($s, $e) $e.Graphics.DrawImage($img, 0, 0, $img.Width, $img.Height) })
+$doc.add_PrintPage({
+    param($s, $e)
+    $area = $e.MarginBounds
+    $scale = [Math]::Min($area.Width / $img.Width, $area.Height / $img.Height)
+    $w = [Math]::Round($img.Width * $scale)
+    $h = [Math]::Round($img.Height * $scale)
+    $x = [Math]::Round($area.Left + ($area.Width - $w) / 2)
+    $y = [Math]::Round($area.Top + ($area.Height - $h) / 2)
+    $e.Graphics.DrawImage($img, $x, $y, $w, $h)
+})
 $doc.Print()
 $img.Dispose()
 `;
@@ -86,9 +95,10 @@ $img.Dispose()
 			execSync(`lp -d "${_printer.name}" "${tempPath}"`, { timeout: 30000 });
 		}
 
-		return true;
-	} catch {
-		return false;
+		return { ok: true };
+	} catch (e: any) {
+		const msg = e?.message || String(e);
+		return { ok: false, error: msg };
 	} finally {
 		try { unlinkSync(tempPath); } catch { /* ignore */ }
 		try { unlinkSync(psPath); } catch { /* ignore */ }

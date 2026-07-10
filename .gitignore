@@ -28,7 +28,11 @@ installer/installer-output/
 installer/*.exe
 
 # Database (user data)
-database/*.sqlite
+database/
+data/
+*.db
+*.db-shm
+*.db-wal
 
 # Uploads
 static/uploads/

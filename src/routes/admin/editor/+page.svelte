@@ -15,9 +15,10 @@
 	let overlays = $state<Overlay[]>(data.template?.overlays ?? []);
 	let selectedId = $state<string | null>(null);
 	let saving = $state(false);
-	let dragState: { type: 'move' | 'resize'; elementId: string; startX: number; startY: number; origX: number; origY: number; origW: number; origH: number; handle?: string } | null = null;
+	let dragState: { type: 'move' | 'resize' | 'canvas-resize'; elementId?: string; startX: number; startY: number; origX: number; origY: number; origW: number; origH: number; handle?: string } | null = null;
 	let canvasEl = $state<HTMLDivElement | undefined>(undefined);
 	let canvasScale = $state(1);
+	let confirmDelete = $state<'slots' | 'overlays' | null>(null);
 
 	let nextOverlayId = $state(overlays.length + 1);
 
@@ -193,6 +194,24 @@
 		};
 	}
 
+	function handleCanvasResizePointerDown(e: PointerEvent, handle: string) {
+		e.stopPropagation();
+		e.preventDefault();
+		const coords = toCanvasCoords(e.clientX, e.clientY);
+		if (!coords) return;
+
+		dragState = {
+			type: 'canvas-resize',
+			handle,
+			startX: coords.x,
+			startY: coords.y,
+			origX: 0,
+			origY: 0,
+			origW: canvasWidth,
+			origH: canvasHeight
+		};
+	}
+
 	function handlePointerMove(e: PointerEvent) {
 		if (!dragState) return;
 		const coords = toCanvasCoords(e.clientX, e.clientY);
@@ -223,8 +242,8 @@
 			if (handle.includes('s')) nh = Math.max(50, ds.origH + dy);
 			if (handle.includes('n')) { nh = Math.max(50, ds.origH - dy); ny = ds.origY + dy; }
 
-			if (ds.elementId.startsWith('slot-')) {
-				const idx = parseInt(ds.elementId.replace('slot-', '')) - 1;
+			if (ds.elementId!.startsWith('slot-')) {
+				const idx = parseInt(ds.elementId!.replace('slot-', '')) - 1;
 				if (idx >= 0 && idx < slots.length) {
 					slots = slots.map((s, i) => i === idx ? { ...s, x: nx, y: ny, width: nw, height: nh } : s);
 				}
@@ -233,6 +252,15 @@
 					o.id === ds.elementId ? { ...o, x: nx, y: ny, width: nw, height: nh } : o
 				);
 			}
+		} else if (ds.type === 'canvas-resize') {
+			const handle = ds.handle!;
+			let nw = ds.origW, nh = ds.origH;
+			if (handle.includes('e')) nw = Math.max(50, ds.origW + dx);
+			if (handle.includes('w')) nw = Math.max(50, ds.origW - dx);
+			if (handle.includes('s')) nh = Math.max(50, ds.origH + dy);
+			if (handle.includes('n')) nh = Math.max(50, ds.origH - dy);
+			canvasWidth = Math.round(nw);
+			canvasHeight = Math.round(nh);
 		}
 	}
 
@@ -248,6 +276,26 @@
 				selectedId = null;
 			}
 		}
+	}
+
+	function removeAllSlots() {
+		slots = [];
+		selectedId = null;
+		confirmDelete = null;
+	}
+
+	function removeAllOverlays() {
+		overlays = [];
+		selectedId = null;
+		confirmDelete = null;
+	}
+
+	function requestRemoveSlots() {
+		confirmDelete = 'slots';
+	}
+
+	function requestRemoveOverlays() {
+		confirmDelete = 'overlays';
 	}
 
 	async function save() {
@@ -358,10 +406,11 @@
 				</div>
 			{:else}
 				{@const scale = getCanvasScale()}
-				<div
-					class="canvas-inner"
-					style="width: {canvasWidth}px; height: {canvasHeight}px; transform: scale({scale});"
-				>
+				<div class="canvas-resize-wrap" style="width: {canvasWidth * scale}px; height: {canvasHeight * scale}px;">
+					<div
+						class="canvas-inner"
+						style="width: {canvasWidth}px; height: {canvasHeight}px; transform: scale({scale}); transform-origin: top left;"
+					>
 					<img src={backgroundPath} alt="BG" class="bg-img" draggable="false" />
 
 					{#each slots as slot, i}
@@ -409,6 +458,15 @@
 						</div>
 					{/each}
 				</div>
+				{#if !selectedId}
+					{#each ['nw', 'ne', 'sw', 'se'] as handle}
+						<div
+							class="canvas-resize-handle {handle}"
+							onpointerdown={(e) => handleCanvasResizePointerDown(e, handle)}
+						></div>
+					{/each}
+				{/if}
+				</div>
 			{/if}
 		</div>
 
@@ -434,7 +492,34 @@
 					{/if}
 				</div>
 			{:else}
+				{#if canvasWidth > 0}
+					<div class="sidebar-section">
+						<h3>Canvas</h3>
+						<label>W <input type="number" bind:value={canvasWidth} min="1" /></label>
+						<label>H <input type="number" bind:value={canvasHeight} min="1" /></label>
+					</div>
+				{/if}
 				<div class="sidebar-empty">Klik slot atau overlay untuk mengatur posisi</div>
+				{#if slots.length > 0}
+					<div class="sidebar-row">
+						<span class="sidebar-count">{slots.length} Slot</span>
+						<button class="sidebar-link danger" onclick={requestRemoveSlots}>Hapus semua</button>
+					</div>
+				{/if}
+				{#if overlays.length > 0}
+					<div class="sidebar-row">
+						<span class="sidebar-count">{overlays.length} Overlay</span>
+						<button class="sidebar-link danger" onclick={requestRemoveOverlays}>Hapus semua</button>
+					</div>
+				{/if}
+			{/if}
+
+			{#if confirmDelete}
+				<div class="confirm-pop">
+					<span>Hapus semua {confirmDelete === 'slots' ? 'slot' : 'overlay'}?</span>
+					<button class="confirm-btn ya" onclick={confirmDelete === 'slots' ? removeAllSlots : removeAllOverlays}>Ya</button>
+					<button class="confirm-btn" onclick={() => confirmDelete = null}>Batal</button>
+				</div>
 			{/if}
 		</div>
 	</div>
@@ -517,6 +602,10 @@
 	.tool-btn:hover { background: #f3f4f6; border-color: #d1d5db; }
 	.tool-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 	.tool-btn.danger:hover { background: #fee2e2; border-color: #fca5a5; color: #dc2626; }
+	.canvas-resize-wrap {
+		position: relative;
+		display: inline-block;
+	}
 	.canvas-container {
 		flex: 1;
 		display: flex;
@@ -614,6 +703,24 @@
 	.resize-handle.s { bottom: -5px; left: 50%; margin-left: -5px; cursor: s-resize; }
 	.resize-handle.e { right: -5px; top: 50%; margin-top: -5px; cursor: e-resize; }
 	.resize-handle.w { left: -5px; top: 50%; margin-top: -5px; cursor: w-resize; }
+	.canvas-resize-handle {
+		position: absolute;
+		width: 12px;
+		height: 12px;
+		background: #4f46e5;
+		border: 1px solid #fff;
+		border-radius: 2px;
+		z-index: 10;
+		cursor: pointer;
+	}
+	.canvas-resize-handle.nw { top: -6px; left: -6px; cursor: nw-resize; }
+	.canvas-resize-handle.ne { top: -6px; right: -6px; cursor: ne-resize; }
+	.canvas-resize-handle.sw { bottom: -6px; left: -6px; cursor: sw-resize; }
+	.canvas-resize-handle.se { bottom: -6px; right: -6px; cursor: se-resize; }
+	.canvas-resize-handle.n { top: -6px; left: 50%; margin-left: -6px; cursor: n-resize; }
+	.canvas-resize-handle.s { bottom: -6px; left: 50%; margin-left: -6px; cursor: s-resize; }
+	.canvas-resize-handle.e { right: -6px; top: 50%; margin-top: -6px; cursor: e-resize; }
+	.canvas-resize-handle.w { left: -6px; top: 50%; margin-top: -6px; cursor: w-resize; }
 	.sidebar {
 		width: 180px;
 		padding: 0.8rem;
@@ -646,5 +753,61 @@
 	.sidebar-empty {
 		font-size: 0.8rem;
 		color: #9ca3af;
+	}
+	.sidebar-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 0.25rem 0;
+		margin-top: 0.4rem;
+	}
+	.sidebar-count {
+		font-size: 0.78rem;
+		font-weight: 600;
+		color: #374151;
+	}
+	.sidebar-link {
+		font-size: 0.75rem;
+		font-weight: 600;
+		background: none;
+		border: none;
+		cursor: pointer;
+		padding: 0;
+		color: #9ca3af;
+	}
+	.sidebar-link:hover { color: #374151; }
+	.sidebar-link.danger:hover { color: #dc2626; }
+	.confirm-pop {
+		margin-top: 0.6rem;
+		padding: 0.5rem;
+		border: 1px solid #e5e7eb;
+		border-radius: 8px;
+		font-size: 0.78rem;
+		color: #374151;
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+		flex-wrap: wrap;
+		animation: confirm-in 0.15s ease-out;
+	}
+	.confirm-btn {
+		padding: 0.25rem 0.6rem;
+		border: 1px solid #d1d5db;
+		border-radius: 5px;
+		background: #fff;
+		font-size: 0.73rem;
+		font-weight: 600;
+		cursor: pointer;
+	}
+	.confirm-btn:hover { background: #f3f4f6; }
+	.confirm-btn.ya {
+		background: #dc2626;
+		border-color: #dc2626;
+		color: #fff;
+	}
+	.confirm-btn.ya:hover { opacity: 0.85; }
+	@keyframes confirm-in {
+		from { opacity: 0; transform: translateY(4px); }
+		to { opacity: 1; transform: translateY(0); }
 	}
 </style>

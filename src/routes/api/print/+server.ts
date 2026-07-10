@@ -22,7 +22,7 @@ export const POST: RequestHandler = async ({ request }) => {
 	const buf = Buffer.from(image.split(',')[1], 'base64');
 	console.log('[PRINT] Image size:', buf.length, 'bytes');
 
-	const ok = await printImage(buf);
-	console.log('[PRINT] Print result:', ok ? 'SUCCESS' : 'FAILED');
-	return json({ ok });
+	const result = await printImage(buf);
+	console.log('[PRINT] Print result:', result);
+	return json(result);
 };

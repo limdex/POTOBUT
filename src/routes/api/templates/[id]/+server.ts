@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { getDb } from '$lib/server/db';
+import { getDb, invalidateTemplateCache } from '$lib/server/db';
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async ({ params }) => {
@@ -51,6 +51,7 @@ export const PUT: RequestHandler = async ({ params, request }) => {
 		overlays ? JSON.stringify(overlays) : null,
 		Number(params.id)
 	);
+	invalidateTemplateCache(Number(params.id));
 
 	const row = db.prepare('SELECT * FROM templates WHERE id = ?').get(Number(params.id)) as any;
 	return json({
@@ -64,5 +65,6 @@ export const DELETE: RequestHandler = async ({ params }) => {
 	const db = getDb();
 	const result = db.prepare('DELETE FROM templates WHERE id = ?').run(Number(params.id));
 	if (result.changes === 0) return json({ error: 'Not found' }, { status: 404 });
+	invalidateTemplateCache(Number(params.id));
 	return json({ ok: true });
 };
