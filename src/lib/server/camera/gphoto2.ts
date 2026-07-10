@@ -8,6 +8,19 @@ function toMsysPath(p: string): string {
 	return p.replace(/\\/g, '/');
 }
 
+function killOrphans(): void {
+	const isWin = process.platform === 'win32';
+	try {
+		if (isWin) {
+			execSync('taskkill /f /im gphoto2.exe 2>nul', { stdio: 'ignore' });
+		} else {
+			execSync('pkill -9 gphoto2 2>/dev/null || true', { stdio: 'ignore' });
+		}
+	} catch {
+		// no orphans, that's fine
+	}
+}
+
 export class Gphoto2Driver implements CameraDriver {
 	readonly name = 'gphoto2 (Canon/Nikon/Sony DSLR)';
 	private _port?: string;
@@ -19,6 +32,7 @@ export class Gphoto2Driver implements CameraDriver {
 	private _previewLogCount = 0;
 
 	async detect(): Promise<boolean> {
+		killOrphans();
 		try {
 			const out = execSync('gphoto2 --auto-detect 2>&1', { timeout: 8000 }).toString();
 			const lines = out.split('\n').filter(l => l.includes('usb:'));
@@ -39,6 +53,7 @@ export class Gphoto2Driver implements CameraDriver {
 
 	async connect(): Promise<boolean> {
 		if (!this._port) return false;
+		await new Promise(r => setTimeout(r, 300));
 		await this.applySettings();
 		this.startPreviewLoop();
 		return true;
@@ -48,6 +63,7 @@ export class Gphoto2Driver implements CameraDriver {
 		await this.stopPreviewLoop();
 		this._port = undefined;
 		this._model = undefined;
+		killOrphans();
 	}
 
 	private startPreviewLoop(): void {
@@ -61,7 +77,7 @@ export class Gphoto2Driver implements CameraDriver {
 			const proc = spawn('gphoto2', [
 				'--capture-preview',
 				'--filename', this._previewPathMsys,
-				'--overwrite',
+				'--force-overwrite',
 				'--quiet'
 			], {
 				stdio: ['ignore', 'pipe', 'pipe'],
@@ -138,22 +154,23 @@ export class Gphoto2Driver implements CameraDriver {
 	}
 
 	private async applySettings(): Promise<void> {
-		const settings = [
-			{ key: 'iso', value: '400' },
-			{ key: 'aperture', value: '5.6' },
-			{ key: 'shutterspeed', value: '1/125' },
-			{ key: 'whitebalance', value: 'Flash' },
+		const cfgArgs = [
+			'--set-config', 'iso=400',
+			'--set-config', 'aperture=5.6',
+			'--set-config', 'shutterspeed=1/125',
+			'--set-config', 'whitebalance=Flash',
 		];
-		for (const s of settings) {
-			try {
-				execSync(`gphoto2 --set-config ${s.key}=${s.value}`, {
-					timeout: 5000,
-					stdio: ['ignore', 'pipe', 'pipe']
-				});
-				console.log('[CAMERA] Set', s.key, '=', s.value);
-			} catch (e: any) {
-				console.log('[CAMERA] Setting', s.key, 'failed:', e?.stderr?.toString()?.trim() || e?.message);
-			}
+		try {
+			const out = execSync(`gphoto2 ${cfgArgs.join(' ')}`, {
+				timeout: 15000,
+				stdio: ['ignore', 'pipe', 'pipe']
+			});
+			console.log('[CAMERA] Settings applied OK');
+			const stdout = out.toString().trim();
+			if (stdout) console.log('[CAMERA] Settings output:', stdout);
+		} catch (e: any) {
+			const stderr = e?.stderr?.toString()?.trim() || e?.message || '';
+			console.log('[CAMERA] Settings failed:', stderr);
 		}
 	}
 
@@ -180,7 +197,7 @@ export class Gphoto2Driver implements CameraDriver {
 		const photoPathMsys = toMsysPath(photoPath);
 
 		try {
-			const stdout = execSync(`gphoto2 --capture-image-and-download --filename "${photoPathMsys}" --overwrite --quiet`, {
+			const stdout = execSync(`gphoto2 --capture-image-and-download --filename "${photoPathMsys}" --force-overwrite --quiet`, {
 				timeout: 45000,
 				stdio: ['ignore', 'pipe', 'pipe']
 			});
@@ -202,7 +219,7 @@ export class Gphoto2Driver implements CameraDriver {
 
 			console.log('[CAMERA] Trying stdout fallback...');
 			try {
-				const buf = execSync('gphoto2 --capture-image-and-download --stdout --quiet', {
+				const buf = execSync('gphoto2 --capture-image-and-download --stdout --force-overwrite --quiet', {
 					timeout: 45000,
 					stdio: ['ignore', 'pipe', 'pipe']
 				});
