@@ -8,20 +8,18 @@ function toMsysPath(p: string): string {
 	return p.replace(/\\/g, '/');
 }
 
-function killOrphans(): void {
-	const isWin = process.platform === 'win32';
-	try {
-		if (isWin) {
-			execSync('taskkill /f /im gphoto2.exe 2>nul', { stdio: 'ignore' });
-		} else {
-			execSync('pkill -9 gphoto2 2>/dev/null || true', { stdio: 'ignore' });
-		}
-	} catch {
-		// no orphans, that's fine
-	}
-}
-
 const GPHOTO_ENV = { ...process.env, MSYS_NO_PATHCONV: '1' } as Record<string, string>;
+
+const SOI = Buffer.from([0xFF, 0xD8]);
+const EOI = Buffer.from([0xFF, 0xD9]);
+
+function extractFirstJpeg(buf: Buffer): Buffer | null {
+	const soiIdx = buf.indexOf(SOI);
+	if (soiIdx === -1) return null;
+	const eoiIdx = buf.indexOf(EOI, soiIdx + 2);
+	if (eoiIdx === -1) return null;
+	return Buffer.from(buf.subarray(soiIdx, eoiIdx + 2));
+}
 
 export class Gphoto2Driver implements CameraDriver {
 	readonly name = 'gphoto2 (Canon/Nikon/Sony DSLR)';
@@ -33,12 +31,12 @@ export class Gphoto2Driver implements CameraDriver {
 	private _frameLogCount = 0;
 	private _photoPath = join(tmpdir(), 'potobut-photo.jpg');
 	private _photoPathMsys = toMsysPath(join(tmpdir(), 'potobut-photo.jpg'));
+	private _moviePath = join(tmpdir(), 'movie.mjpg');
 
 	async detect(): Promise<boolean> {
 		if (this._streaming) {
 			await this.stopStream();
 		}
-		killOrphans();
 		try {
 			const out = execSync('gphoto2 --auto-detect 2>&1', {
 				timeout: 8000,
@@ -54,6 +52,13 @@ export class Gphoto2Driver implements CameraDriver {
 			if (modelParts) this._model = modelParts;
 
 			console.log('[CAMERA] gphoto2 detected:', this._model || 'unknown', 'at', this._port);
+
+			try {
+				execSync('gphoto2 --reset', { timeout: 5000, env: GPHOTO_ENV, stdio: 'ignore' });
+				console.log('[CAMERA] USB reset OK');
+			} catch {
+				// reset may not be supported, that's fine
+			}
 			return true;
 		} catch {
 			return false;
@@ -62,7 +67,7 @@ export class Gphoto2Driver implements CameraDriver {
 
 	async connect(): Promise<boolean> {
 		if (!this._port) return false;
-		await new Promise(r => setTimeout(r, 300));
+		await new Promise(r => setTimeout(r, 1000));
 		await this.applySettings();
 		this.startStream();
 		return true;
@@ -72,7 +77,6 @@ export class Gphoto2Driver implements CameraDriver {
 		await this.stopStream();
 		this._port = undefined;
 		this._model = undefined;
-		killOrphans();
 	}
 
 	private startStream(): void {
@@ -84,22 +88,20 @@ export class Gphoto2Driver implements CameraDriver {
 		const runFrame = () => {
 			if (!this._streaming) return;
 
+			try { unlinkSync(this._moviePath); } catch { /* */ }
+
 			const proc = spawn('gphoto2', [
 				'--capture-movie=1',
-				'--stdout',
+				'--force-overwrite',
 				'--quiet'
 			], {
 				stdio: ['ignore', 'pipe', 'pipe'],
 				windowsHide: true,
-				env: GPHOTO_ENV
+				env: GPHOTO_ENV,
+				cwd: tmpdir()
 			});
 
 			this._streamProcess = proc;
-
-			const chunks: Buffer[] = [];
-			proc.stdout?.on('data', (chunk: Buffer) => {
-				chunks.push(chunk);
-			});
 
 			let stderrBuf = '';
 			proc.stderr?.on('data', (data: Buffer) => {
@@ -119,16 +121,30 @@ export class Gphoto2Driver implements CameraDriver {
 				if (!this._streaming) return;
 
 				if (code === 0) {
-					const frame = Buffer.concat(chunks);
-					if (frame.length > 500) {
-						this._latestFrame = frame;
-						if (this._frameLogCount < 2) {
-							console.log('[CAMERA] Frame captured OK, size:', frame.length, 'bytes');
+					try {
+						if (existsSync(this._moviePath)) {
+							const raw = readFileSync(this._moviePath);
+							const jpeg = extractFirstJpeg(raw);
+							try { unlinkSync(this._moviePath); } catch { /* */ }
+							if (jpeg && jpeg.length > 500) {
+								this._latestFrame = jpeg;
+								if (this._frameLogCount < 2) {
+									console.log('[CAMERA] Frame captured OK, size:', jpeg.length, 'bytes');
+									this._frameLogCount++;
+								}
+							} else if (this._frameLogCount < 3) {
+								console.log('[CAMERA] Frame extraction failed, raw size:', raw.length);
+								this._frameLogCount++;
+							}
+						} else if (this._frameLogCount < 3) {
+							console.log('[CAMERA] No movie file created');
 							this._frameLogCount++;
 						}
-					} else if (this._frameLogCount < 3) {
-						console.log('[CAMERA] Frame too small:', frame.length, 'bytes');
-						this._frameLogCount++;
+					} catch (e: any) {
+						if (this._frameLogCount < 3) {
+							console.log('[CAMERA] Frame read error:', e?.message);
+							this._frameLogCount++;
+						}
 					}
 					runFrame();
 				} else {
@@ -164,7 +180,15 @@ export class Gphoto2Driver implements CameraDriver {
 			};
 
 			proc.on('exit', done);
-			proc.kill();
+
+			try { proc.kill('SIGINT'); } catch { /* */ }
+
+			setTimeout(() => {
+				if (!resolved) {
+					console.log('[CAMERA] Stream did not exit on SIGINT, trying SIGTERM');
+					try { proc.kill('SIGTERM'); } catch { /* */ }
+				}
+			}, 3000);
 
 			setTimeout(() => {
 				if (!resolved) {
@@ -172,7 +196,7 @@ export class Gphoto2Driver implements CameraDriver {
 					try { proc.kill('SIGKILL'); } catch { /* */ }
 					done();
 				}
-			}, 3000);
+			}, 5000);
 		});
 	}
 
