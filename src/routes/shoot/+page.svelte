@@ -6,14 +6,12 @@
 
 	let { data }: { data: PageData } = $props();
 
-	const template = data.template;
-
 	let countdown = $state(5);
 	let currentShot = $state(0);
 	let phase = $state<'ready' | 'countdown' | 'done'>('ready');
 	let flash = $state(false);
 
-	const totalShots = $derived(template?.slot_count ?? 1);
+	const totalShots = $derived(data.template?.slot_count ?? 1);
 
 	function generatePlaceholder(): string {
 		const canvas = document.createElement('canvas');
@@ -145,7 +143,7 @@
 			</div>
 		{:else if phase === 'countdown'}
 			<div class="viewfinder-content">
-				<div class="shot-info">Potret {currentShot + 1} / {template?.slot_count}</div>
+				<div class="shot-info">Potret {currentShot + 1} / {data.template?.slot_count}</div>
 				<div class="countdown-ring">
 					<svg viewBox="0 0 120 120">
 						<circle cx="60" cy="60" r="52" fill="none" stroke="rgba(255,255,255,0.2)" stroke-width="6" />
@@ -164,7 +162,7 @@
 		{:else if phase === 'done'}
 			<div class="viewfinder-content">
 				<p class="shot-label">Selesai!</p>
-				<button class="btn" onclick={() => goto(`/review?template=${template?.id}`)}>Lihat Hasil</button>
+				<button class="btn" onclick={() => goto(`/review?template=${data.template?.id}`)}>Lihat Hasil</button>
 			</div>
 		{/if}
 	</div>
@@ -173,7 +171,7 @@
 		{#each shootState.capturedPhotos as photo (photo.id)}
 			<img src={photo.data} alt="Shot {photo.id}" class="thumb" />
 		{/each}
-		{#each Array((template?.slot_count ?? 0) - shootState.capturedPhotos.length) as _, i}
+		{#each Array((data.template?.slot_count ?? 0) - shootState.capturedPhotos.length) as _, i}
 			<div class="thumb empty"></div>
 		{/each}
 	</div>
