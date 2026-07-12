@@ -1,6 +1,7 @@
 import { execSync } from 'child_process';
 import { tmpdir } from 'os';
 import { join } from 'path';
+import type { ChildProcess } from 'child_process';
 import type { CameraDriver } from './driver';
 
 const GOPRO_API = 'http://10.5.5.9:8080';
@@ -32,21 +33,18 @@ export class GoProDriver implements CameraDriver {
 		this._connected = false;
 	}
 
+	startLiveFeed(): ChildProcess | null {
+		return null;
+	}
+
+	async stopLiveFeed(): Promise<void> {
+		// no-op
+	}
+
 	async fetchApi(path: string): Promise<Response | null> {
 		try {
 			const resp = await fetch(`${GOPRO_API}${path}`, { signal: AbortSignal.timeout(3000) });
 			return resp;
-		} catch {
-			return null;
-		}
-	}
-
-	async capturePreview(): Promise<ArrayBuffer | null> {
-		if (!this._connected) return null;
-		try {
-			const resp = await fetch(`${GOPRO_API}/gp/gpMediaMetadata`, { signal: AbortSignal.timeout(3000) });
-			if (!resp.ok) return null;
-			return await resp.arrayBuffer();
 		} catch {
 			return null;
 		}

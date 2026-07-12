@@ -1,6 +1,7 @@
 import { join } from 'path';
 import { readFileSync, existsSync, readdirSync, statSync } from 'fs';
 import { homedir } from 'os';
+import type { ChildProcess } from 'child_process';
 import type { CameraDriver } from './driver';
 
 const DIGICAM_URL = 'http://127.0.0.1:5513';
@@ -123,23 +124,12 @@ export class DigiCamControlDriver implements CameraDriver {
 		this._connected = false;
 	}
 
-	async capturePreview(): Promise<ArrayBuffer | null> {
-		if (!this._connected) return null;
-		console.log('[CAMERA] Fetching live view frame...');
-		const frame = await readMjpegFrame(`${DIGICAM_URL}/?cmd=liveview`, 5000);
-		if (frame) {
-			console.log('[CAMERA] Live view frame:', frame.byteLength, 'bytes');
-			return frame;
-		}
-		console.log('[CAMERA] Live view failed, fallback to last photo');
-		if (this._imageDir) {
-			const latest = getLatestPhoto(this._imageDir);
-			if (latest) {
-				const buf = readFileSync(latest);
-				return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
-			}
-		}
+	startLiveFeed(): ChildProcess | null {
 		return null;
+	}
+
+	async stopLiveFeed(): Promise<void> {
+		// no-op
 	}
 
 	async capturePhoto(): Promise<ArrayBuffer | null> {
@@ -156,6 +146,6 @@ export class DigiCamControlDriver implements CameraDriver {
 				return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
 			}
 		}
-		return this.capturePreview();
+		return null;
 	}
 }

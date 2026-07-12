@@ -25,25 +25,7 @@
 
 	let timerId: ReturnType<typeof setTimeout> | undefined;
 	let cameraConnected = $state(false);
-	let previewSrc = $state<string | null>(null);
-	let previewTimer: ReturnType<typeof setInterval> | undefined;
-	let polling = false;
-
-	async function refreshPreview() {
-		if (polling) return;
-		polling = true;
-		try {
-			const res = await fetch(`/api/camera/preview?t=${Date.now()}`);
-			if (!res.ok) return;
-			const blob = await res.blob();
-			if (previewSrc) URL.revokeObjectURL(previewSrc);
-			previewSrc = URL.createObjectURL(blob);
-		} catch {
-			// ignore
-		} finally {
-			polling = false;
-		}
-	}
+	let liveFeedKey = $state(0);
 
 	function startCountdown() {
 		phase = 'countdown';
@@ -64,27 +46,27 @@
 
 	async function capture() {
 		flash = true;
-		let data: string;
+		let photoData: string;
 		if (cameraConnected) {
 			console.log('[SHOOT] Capturing photo from camera...');
 			const res = await fetch('/api/camera/capture', { method: 'POST' });
 			if (res.ok) {
 				const blob = await res.blob();
 				console.log('[SHOOT] Capture success, blob size:', blob.size, 'bytes');
-				data = await new Promise<string>((resolve) => {
+				photoData = await new Promise<string>((resolve) => {
 					const reader = new FileReader();
 					reader.onload = () => resolve(reader.result as string);
 					reader.readAsDataURL(blob);
 				});
 			} else {
 				console.log('[SHOOT] Capture failed, using placeholder');
-				data = generatePlaceholder();
+				photoData = generatePlaceholder();
 			}
 		} else {
 			console.log('[SHOOT] Camera not connected, using placeholder');
-			data = generatePlaceholder();
+			photoData = generatePlaceholder();
 		}
-		shootState.addPhoto(data);
+		shootState.addPhoto(photoData);
 		console.log('[SHOOT] Photo added, total:', shootState.capturedPhotos.length);
 		setTimeout(() => {
 			flash = false;
@@ -96,6 +78,8 @@
 				phase = 'done';
 				timerId = undefined;
 			}
+			// bump key to reload live feed <img> after capture (camera was locked)
+			liveFeedKey++;
 		}, 400);
 	}
 
@@ -104,13 +88,6 @@
 		fetch('/api/camera').then(r => r.json()).then(status => {
 			console.log('[SHOOT] Camera status:', status);
 			cameraConnected = status.connected;
-			if (status.connected) {
-				console.log('[SHOOT] Starting live preview');
-				refreshPreview();
-				previewTimer = setInterval(refreshPreview, 200);
-			} else {
-				console.log('[SHOOT] Camera not connected, using placeholders');
-			}
 		}).catch(err => {
 			console.error('[SHOOT] Error checking camera:', err);
 		});
@@ -118,8 +95,6 @@
 
 	onDestroy(() => {
 		if (timerId) clearTimeout(timerId);
-		if (previewTimer) clearInterval(previewTimer);
-		if (previewSrc) URL.revokeObjectURL(previewSrc);
 	});
 </script>
 
@@ -129,8 +104,8 @@
 
 <div class="page">
 	<div class="viewfinder">
-		{#if cameraConnected && previewSrc}
-			<img src={previewSrc} class="camera-bg" alt="" />
+		{#if cameraConnected}
+			<img src={`/api/camera/live-feed?t=${liveFeedKey}`} class="camera-bg" alt="" />
 		{/if}
 		{#if flash}
 			<div class="flash-overlay"></div>

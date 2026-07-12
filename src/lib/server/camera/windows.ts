@@ -47,37 +47,32 @@ export class WindowsCameraDriver implements CameraDriver {
 		return false;
 	}
 
-	private _startFfmpeg(): void {
-		if (!this._deviceName || !this._streamPath) return;
-		this._ffmpeg = spawn('ffmpeg', [
-			'-y', '-fflags', 'nobuffer',
-			'-f', 'dshow',
-			'-rtbufsize', '32M',
-			'-i', `video=${this._deviceName}`,
-			'-vf', 'fps=15',
-			'-q:v', '5',
-			'-f', 'image2',
-			'-update', '1',
-			this._streamPath
-		], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
-
-		this._ffmpeg.stderr?.on('data', () => {});
-		this._ffmpeg.on('error', (e) => console.log('[CAMERA] ffmpeg error:', e.message));
-		this._ffmpeg.on('exit', () => {
-			this._ffmpeg = null;
-			if (this._connected) {
-				setTimeout(() => this._startFfmpeg(), 1000);
-			}
-		});
-	}
-
 	async connect(): Promise<boolean> {
 		if (!this._deviceName) return false;
-
 		this._streamPath = join(tmpdir(), 'potobut-live.jpg');
 
 		try {
-			this._startFfmpeg();
+			this._ffmpeg = spawn('ffmpeg', [
+				'-y', '-fflags', 'nobuffer',
+				'-f', 'dshow',
+				'-rtbufsize', '32M',
+				'-i', `video=${this._deviceName}`,
+				'-vf', 'fps=15',
+				'-q:v', '5',
+				'-f', 'image2',
+				'-update', '1',
+				this._streamPath
+			], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+
+			this._ffmpeg.stderr?.on('data', () => {});
+			this._ffmpeg.on('error', (e) => console.log('[CAMERA] ffmpeg error:', e.message));
+			this._ffmpeg.on('exit', () => {
+				this._ffmpeg = null;
+				if (this._connected) {
+					setTimeout(() => this._startFfmpegLoop(), 1000);
+				}
+			});
+
 			await new Promise<void>((resolve, reject) => {
 				const check = setInterval(() => {
 					if (existsSync(this._streamPath) && statSync(this._streamPath).size > 1000) {
@@ -99,6 +94,56 @@ export class WindowsCameraDriver implements CameraDriver {
 		}
 	}
 
+	private _startFfmpegLoop(): void {
+		if (!this._deviceName) return;
+		this._ffmpeg = spawn('ffmpeg', [
+			'-y', '-fflags', 'nobuffer',
+			'-f', 'dshow',
+			'-rtbufsize', '32M',
+			'-i', `video=${this._deviceName}`,
+			'-vf', 'fps=15',
+			'-q:v', '5',
+			'-f', 'image2',
+			'-update', '1',
+			this._streamPath
+		], { stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true });
+
+		this._ffmpeg.stderr?.on('data', () => {});
+		this._ffmpeg.on('error', (e) => console.log('[CAMERA] ffmpeg error:', e.message));
+		this._ffmpeg.on('exit', () => {
+			this._ffmpeg = null;
+			if (this._connected) {
+				setTimeout(() => this._startFfmpegLoop(), 1000);
+			}
+		});
+	}
+
+	startLiveFeed(): ChildProcess | null {
+		if (!this._deviceName) return null;
+
+		const proc = spawn('ffmpeg', [
+			'-hide_banner', '-loglevel', 'error',
+			'-f', 'dshow',
+			'-rtbufsize', '32M',
+			'-i', `video=${this._deviceName}`,
+			'-vf', 'fps=15,format=mjpeg',
+			'-f', 'image2pipe',
+			'-'
+		], {
+			stdio: ['ignore', 'pipe', 'pipe'],
+			windowsHide: true
+		});
+
+		return proc;
+	}
+
+	async stopLiveFeed(): Promise<void> {
+		if (this._ffmpeg) {
+			this._ffmpeg.kill('SIGTERM');
+			this._ffmpeg = null;
+		}
+	}
+
 	async disconnect(): Promise<void> {
 		this._connected = false;
 		if (this._ffmpeg) {
@@ -107,19 +152,16 @@ export class WindowsCameraDriver implements CameraDriver {
 		}
 	}
 
-	async capturePreview(): Promise<ArrayBuffer | null> {
-		if (!this._streamPath || !this._connected) return null;
+	async capturePhoto(): Promise<ArrayBuffer | null> {
 		try {
 			const { readFile } = await import('fs/promises');
 			const buf = await readFile(this._streamPath);
 			if (buf.length < 100) return null;
-			return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+			const ab = new ArrayBuffer(buf.length);
+			new Uint8Array(ab).set(buf);
+			return ab;
 		} catch {
 			return null;
 		}
-	}
-
-	async capturePhoto(): Promise<ArrayBuffer | null> {
-		return this.capturePreview();
 	}
 }

@@ -2,6 +2,7 @@ import { execSync } from 'child_process';
 import { readFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
+import type { ChildProcess } from 'child_process';
 import type { CameraDriver } from './driver';
 
 export class WebcamDriver implements CameraDriver {
@@ -35,7 +36,6 @@ export class WebcamDriver implements CameraDriver {
 			}
 			return false;
 		} catch {
-			// ffmpeg fallback for non-Windows
 			return false;
 		}
 	}
@@ -48,7 +48,15 @@ export class WebcamDriver implements CameraDriver {
 		this._device = undefined;
 	}
 
-	private async captureFrame(): Promise<ArrayBuffer | null> {
+	startLiveFeed(): ChildProcess | null {
+		return null;
+	}
+
+	async stopLiveFeed(): Promise<void> {
+		// no-op
+	}
+
+	async capturePhoto(): Promise<ArrayBuffer | null> {
 		const framePath = join(tmpdir(), 'potobut-webcam.jpg');
 		try {
 			execSync(`fswebcam --no-banner -r 640x480 "${framePath}" 2>/dev/null`, { timeout: 8000 });
@@ -69,13 +77,5 @@ export class WebcamDriver implements CameraDriver {
 				}
 			}
 		}
-	}
-
-	async capturePreview(): Promise<ArrayBuffer | null> {
-		return this.captureFrame();
-	}
-
-	async capturePhoto(): Promise<ArrayBuffer | null> {
-		return this.captureFrame();
 	}
 }

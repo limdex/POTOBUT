@@ -10,33 +10,15 @@ function toMsysPath(p: string): string {
 
 const GPHOTO_ENV = { ...process.env, MSYS_NO_PATHCONV: '1' } as Record<string, string>;
 
-const SOI = Buffer.from([0xFF, 0xD8]);
-const EOI = Buffer.from([0xFF, 0xD9]);
-
-function extractFirstJpeg(buf: Buffer): Buffer | null {
-	const soiIdx = buf.indexOf(SOI);
-	if (soiIdx === -1) return null;
-	const eoiIdx = buf.indexOf(EOI, soiIdx + 2);
-	if (eoiIdx === -1) return null;
-	return Buffer.from(buf.subarray(soiIdx, eoiIdx + 2));
-}
-
 export class Gphoto2Driver implements CameraDriver {
 	readonly name = 'gphoto2 (Canon/Nikon/Sony DSLR)';
 	private _port?: string;
 	private _model?: string;
-	private _streamProcess: ChildProcess | null = null;
-	private _streaming = false;
-	private _latestFrame: Buffer | null = null;
-	private _frameLogCount = 0;
+	private _liveProcess: ChildProcess | null = null;
 	private _photoPath = join(tmpdir(), 'potobut-photo.jpg');
 	private _photoPathMsys = toMsysPath(join(tmpdir(), 'potobut-photo.jpg'));
-	private _moviePath = join(tmpdir(), 'movie.mjpg');
 
 	async detect(): Promise<boolean> {
-		if (this._streaming) {
-			await this.stopStream();
-		}
 		try {
 			const out = execSync('gphoto2 --auto-detect 2>&1', {
 				timeout: 8000,
@@ -69,130 +51,46 @@ export class Gphoto2Driver implements CameraDriver {
 		if (!this._port) return false;
 		await new Promise(r => setTimeout(r, 1000));
 		await this.applySettings();
-		this.startStream();
 		return true;
 	}
 
 	async disconnect(): Promise<void> {
-		await this.stopStream();
 		this._port = undefined;
 		this._model = undefined;
 	}
 
-	private startStream(): void {
-		if (this._streaming) return;
-		this._streaming = true;
-		this._latestFrame = null;
-		this._frameLogCount = 0;
+	startLiveFeed(): ChildProcess | null {
+		if (!this._port) return null;
 
-		const runFrame = () => {
-			if (!this._streaming) return;
+		const proc = spawn('gphoto2', [
+			'--capture-movie=999999',
+			'--stdout',
+			'--quiet'
+		], {
+			stdio: ['ignore', 'pipe', 'pipe'],
+			windowsHide: true,
+			env: GPHOTO_ENV
+		});
 
-			try { unlinkSync(this._moviePath); } catch { /* */ }
-
-			const proc = spawn('gphoto2', [
-				'--capture-movie=1',
-				'--force-overwrite',
-				'--quiet'
-			], {
-				stdio: ['ignore', 'pipe', 'pipe'],
-				windowsHide: true,
-				env: GPHOTO_ENV,
-				cwd: tmpdir()
-			});
-
-			this._streamProcess = proc;
-
-			let stderrBuf = '';
-			proc.stderr?.on('data', (data: Buffer) => {
-				stderrBuf += data.toString();
-			});
-
-			proc.on('error', (e) => {
-				console.log('[CAMERA] Frame process error:', e.message);
-				this._streamProcess = null;
-				if (this._streaming) {
-					setTimeout(runFrame, 1000);
-				}
-			});
-
-			proc.on('exit', (code) => {
-				this._streamProcess = null;
-				if (!this._streaming) return;
-
-				if (code === 0) {
-					try {
-						if (existsSync(this._moviePath)) {
-							const raw = readFileSync(this._moviePath);
-							const jpeg = extractFirstJpeg(raw);
-							try { unlinkSync(this._moviePath); } catch { /* */ }
-							if (jpeg && jpeg.length > 500) {
-								this._latestFrame = jpeg;
-								if (this._frameLogCount < 2) {
-									console.log('[CAMERA] Frame captured OK, size:', jpeg.length, 'bytes');
-									this._frameLogCount++;
-								}
-							} else if (this._frameLogCount < 3) {
-								console.log('[CAMERA] Frame extraction failed, raw size:', raw.length);
-								this._frameLogCount++;
-							}
-						} else if (this._frameLogCount < 3) {
-							console.log('[CAMERA] No movie file created');
-							this._frameLogCount++;
-						}
-					} catch (e: any) {
-						if (this._frameLogCount < 3) {
-							console.log('[CAMERA] Frame read error:', e?.message);
-							this._frameLogCount++;
-						}
-					}
-					runFrame();
-				} else {
-					if (this._frameLogCount < 3) {
-						console.log('[CAMERA] Frame exit code', code, stderrBuf.trim() ? `stderr: ${stderrBuf.trim()}` : '(no stderr)');
-						this._frameLogCount++;
-					}
-					setTimeout(runFrame, 1000);
-				}
-			});
-		};
-
-		runFrame();
-		console.log('[CAMERA] Live view stream started');
+		this._liveProcess = proc;
+		return proc;
 	}
 
-	private stopStream(): Promise<void> {
-		this._streaming = false;
-		return new Promise((resolve) => {
-			if (!this._streamProcess) {
-				resolve();
-				return;
-			}
+	async stopLiveFeed(): Promise<void> {
+		if (!this._liveProcess) return;
 
-			const proc = this._streamProcess;
+		const proc = this._liveProcess;
+		this._liveProcess = null;
+
+		return new Promise<void>((resolve) => {
 			let resolved = false;
-
-			const done = () => {
-				if (resolved) return;
-				resolved = true;
-				this._streamProcess = null;
-				resolve();
-			};
+			const done = () => { if (!resolved) { resolved = true; resolve(); } };
 
 			proc.on('exit', done);
-
 			try { proc.kill('SIGINT'); } catch { /* */ }
 
 			setTimeout(() => {
 				if (!resolved) {
-					console.log('[CAMERA] Stream did not exit on SIGINT, trying SIGTERM');
-					try { proc.kill('SIGTERM'); } catch { /* */ }
-				}
-			}, 3000);
-
-			setTimeout(() => {
-				if (!resolved) {
-					console.log('[CAMERA] Stream did not exit, force killing');
 					try { proc.kill('SIGKILL'); } catch { /* */ }
 					done();
 				}
@@ -223,18 +121,7 @@ export class Gphoto2Driver implements CameraDriver {
 		}
 	}
 
-	async capturePreview(): Promise<ArrayBuffer | null> {
-		if (!this._latestFrame || this._latestFrame.length < 500) return null;
-		const ab = new ArrayBuffer(this._latestFrame.length);
-		new Uint8Array(ab).set(this._latestFrame);
-		return ab;
-	}
-
 	async capturePhoto(): Promise<ArrayBuffer | null> {
-		console.log('[CAMERA] Stopping stream for capture...');
-		await this.stopStream();
-		await new Promise(r => setTimeout(r, 500));
-
 		try {
 			const stdout = execSync(`gphoto2 --capture-image-and-download --filename "${this._photoPathMsys}" --force-overwrite --quiet`, {
 				timeout: 45000,
@@ -279,11 +166,6 @@ export class Gphoto2Driver implements CameraDriver {
 				console.log('[CAMERA] Stdout fallback failed:', e2?.message || e2);
 				if (stderr2) console.log('[CAMERA] Stdout fallback stderr:', stderr2);
 				return null;
-			}
-		} finally {
-			if (this._port) {
-				console.log('[CAMERA] Restarting stream after capture...');
-				this.startStream();
 			}
 		}
 	}
