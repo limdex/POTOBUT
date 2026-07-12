@@ -1,4 +1,5 @@
 import type { CameraDriver } from './camera/driver';
+import { EdsdkDriver } from './camera/edsdk';
 import { Gphoto2Driver } from './camera/gphoto2';
 import { WindowsCameraDriver } from './camera/windows';
 import { WebcamDriver } from './camera/webcam';
@@ -12,6 +13,7 @@ export interface CameraInfo {
 }
 
 const drivers: CameraDriver[] = [
+	new EdsdkDriver(),
 	new Gphoto2Driver(),
 	new WindowsCameraDriver(),
 	new WebcamDriver(),
