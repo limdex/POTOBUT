@@ -115,7 +115,7 @@ export async function capturePhoto(): Promise<ArrayBuffer | null> {
 	if (hadLiveFeed) {
 		console.log('[CAMERA] Stopping live feed for capture...');
 		await stopLiveFeed();
-		await new Promise(r => setTimeout(r, 500));
+		await new Promise(r => setTimeout(r, 2000));
 	}
 
 	try {

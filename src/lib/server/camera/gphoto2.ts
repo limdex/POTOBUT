@@ -154,7 +154,7 @@ export class Gphoto2Driver implements CameraDriver {
 		const proc = this._liveProcess;
 		this._liveProcess = null;
 
-		return new Promise<void>((resolve) => {
+		await new Promise<void>((resolve) => {
 			let resolved = false;
 			const done = () => { if (!resolved) { resolved = true; resolve(); } };
 
@@ -169,6 +169,14 @@ export class Gphoto2Driver implements CameraDriver {
 				}
 			}, 5000);
 		});
+
+		await new Promise(r => setTimeout(r, 500));
+		try {
+			execSync('gphoto2 --reset', { timeout: 10000, env: GPHOTO_ENV, stdio: 'ignore' });
+			console.log('[CAMERA] USB reset after stop');
+		} catch (e: any) {
+			console.log('[CAMERA] USB reset after stop failed:', e?.message);
+		}
 	}
 
 	private async applySettings(): Promise<void> {
