@@ -122,25 +122,13 @@ export async function capturePhoto(): Promise<ArrayBuffer | null> {
 	if (hadLiveFeed) {
 		console.log('[CAMERA] Stopping live feed for capture...');
 		await stopLiveFeed();
-		await new Promise(r => setTimeout(r, 3000));
-	} else {
-		// Feed already stopped by prepareCapture, just settle
 		await new Promise(r => setTimeout(r, 1000));
+	} else {
+		await new Promise(r => setTimeout(r, 500));
 	}
 
 	try {
-		for (let attempt = 0; attempt < 2; attempt++) {
-			if (attempt > 0) {
-				console.log('[CAMERA] Capture retry', attempt + 1, '/ 2');
-				await new Promise(r => setTimeout(r, 1500));
-			}
-			const result = await _activeDriver.capturePhoto();
-			if (result) {
-				if (attempt > 0) console.log('[CAMERA] Capture succeeded on retry', attempt);
-				return result;
-			}
-		}
-		return null;
+		return await _activeDriver.capturePhoto();
 	} finally {
 		_capturing = false;
 		if (hadLiveFeed || _subscribers.size > 0) {

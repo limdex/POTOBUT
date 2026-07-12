@@ -34,10 +34,13 @@ export class Gphoto2Driver implements CameraDriver {
 	private _model?: string;
 	private _liveProcess: ChildProcess | null = null;
 	private _pollId: ReturnType<typeof setInterval> | null = null;
+	private _keepAlive = false;
+	private _onFrame: ((buf: Buffer) => void) | null = null;
 	private _lastReadOffset = 0;
 	private _photoPath = join(tmpdir(), 'potobut-photo.jpg');
 	private _photoPathMsys = toMsysPath(join(tmpdir(), 'potobut-photo.jpg'));
 	private _frameLogCount = 0;
+	private _batchIndex = 0;
 
 	async detect(): Promise<boolean> {
 		try {
@@ -86,8 +89,23 @@ export class Gphoto2Driver implements CameraDriver {
 		const moviePath = join(tmpdir(), 'movie.mjpg');
 		try { unlinkSync(moviePath); } catch { /* */ }
 
+		this._onFrame = onFrame;
+		this._keepAlive = true;
+		this._frameLogCount = 0;
+		this._batchIndex = 0;
+
+		this._startMovieBatch(moviePath);
+		return true;
+	}
+
+	private _startMovieBatch(moviePath: string): void {
+		if (!this._keepAlive) return;
+
+		this._batchIndex++;
+		try { unlinkSync(moviePath); } catch { /* */ }
+
 		const proc = spawn('gphoto2', [
-			'--capture-movie=999999',
+			'--capture-movie=15',
 			'--force-overwrite',
 			'--quiet'
 		], {
@@ -99,19 +117,48 @@ export class Gphoto2Driver implements CameraDriver {
 
 		this._liveProcess = proc;
 		this._lastReadOffset = 0;
-		this._frameLogCount = 0;
+
+		if (this._batchIndex === 1) {
+			this._startPolling(moviePath);
+		}
 
 		let stderrBuf = '';
 		proc.stderr?.on('data', (d: Buffer) => { stderrBuf += d.toString(); });
 
-		proc.on('exit', (code) => {
-			if (code !== 0 && this._frameLogCount < 3) {
-				console.log('[CAMERA] Movie process exited code', code, stderrBuf.trim() ? `stderr: ${stderrBuf.trim()}` : '');
-				this._frameLogCount++;
+		proc.on('error', (e) => {
+			console.log('[CAMERA] Movie batch error:', e.message);
+			this._liveProcess = null;
+			if (this._keepAlive) {
+				setTimeout(() => this._startMovieBatch(moviePath), 1000);
 			}
 		});
 
+		proc.on('exit', (code) => {
+			this._liveProcess = null;
+			if (!this._keepAlive) return;
+
+			if (code === 0) {
+				if (this._frameLogCount < 2) {
+					console.log('[CAMERA] Movie batch', this._batchIndex, 'finished OK');
+					this._frameLogCount++;
+				}
+				this._startMovieBatch(moviePath);
+			} else {
+				if (this._frameLogCount < 3) {
+					console.log('[CAMERA] Movie batch', this._batchIndex, 'exited code', code,
+						stderrBuf.trim() ? `stderr: ${stderrBuf.trim()}` : '');
+					this._frameLogCount++;
+				}
+				setTimeout(() => this._startMovieBatch(moviePath), 1000);
+			}
+		});
+	}
+
+	private _startPolling(moviePath: string): void {
+		if (this._pollId) return;
+
 		this._pollId = setInterval(() => {
+			if (!this._onFrame) return;
 			try {
 				if (!existsSync(moviePath)) return;
 
@@ -132,58 +179,42 @@ export class Gphoto2Driver implements CameraDriver {
 						console.log('[CAMERA] Frame OK, size:', jpeg.length, 'bytes');
 						this._frameLogCount++;
 					}
-					onFrame(jpeg);
+					this._onFrame(jpeg);
 				}
 			} catch {
-				// File locked or removed, skip this cycle
+				// File locked or removed, skip
 			}
 		}, 100);
 
 		console.log('[CAMERA] Live feed started (file polling)');
-		return true;
 	}
 
 	async stopLiveFeed(): Promise<void> {
+		this._keepAlive = false;
+
 		if (this._pollId) {
 			clearInterval(this._pollId);
 			this._pollId = null;
 		}
+		this._onFrame = null;
 
-		if (!this._liveProcess) return;
-
-		const proc = this._liveProcess;
-		this._liveProcess = null;
-
-		await new Promise<void>((resolve) => {
-			let resolved = false;
-			const done = () => { if (!resolved) { resolved = true; resolve(); } };
-
-			proc.on('exit', done);
-			try { proc.kill('SIGINT'); } catch { /* */ }
-
-			setTimeout(() => {
-				if (!resolved) {
-					console.log('[CAMERA] Movie process not exiting, force kill');
-					try { proc.kill('SIGKILL'); } catch { /* */ }
-					done();
-				}
-			}, 5000);
-		});
-
-		// Force camera out of live view with multiple resets
-		await new Promise(r => setTimeout(r, 1000));
-		try {
-			execSync('gphoto2 --reset', { timeout: 10000, env: GPHOTO_ENV, stdio: 'ignore' });
-			console.log('[CAMERA] USB reset 1/2 OK');
-		} catch (e: any) {
-			console.log('[CAMERA] USB reset 1/2 failed:', e?.message);
+		// Wait for current batch to finish naturally (15 frames at ~10fps = ~1.5s)
+		if (this._liveProcess) {
+			const proc = this._liveProcess;
+			this._liveProcess = null;
+			await new Promise<void>((resolve) => {
+				if (proc.exitCode !== null) { resolve(); return; }
+				proc.on('exit', () => resolve());
+				setTimeout(() => resolve(), 3000);
+			});
 		}
-		await new Promise(r => setTimeout(r, 2000));
+
+		await new Promise(r => setTimeout(r, 500));
 		try {
 			execSync('gphoto2 --reset', { timeout: 10000, env: GPHOTO_ENV, stdio: 'ignore' });
-			console.log('[CAMERA] USB reset 2/2 OK');
+			console.log('[CAMERA] USB reset after stop OK');
 		} catch (e: any) {
-			console.log('[CAMERA] USB reset 2/2 failed:', e?.message);
+			console.log('[CAMERA] USB reset failed:', e?.message);
 		}
 	}
 
