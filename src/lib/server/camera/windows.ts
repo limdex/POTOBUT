@@ -118,30 +118,12 @@ export class WindowsCameraDriver implements CameraDriver {
 		});
 	}
 
-	startLiveFeed(): ChildProcess | null {
-		if (!this._deviceName) return null;
-
-		const proc = spawn('ffmpeg', [
-			'-hide_banner', '-loglevel', 'error',
-			'-f', 'dshow',
-			'-rtbufsize', '32M',
-			'-i', `video=${this._deviceName}`,
-			'-vf', 'fps=15,format=mjpeg',
-			'-f', 'image2pipe',
-			'-'
-		], {
-			stdio: ['ignore', 'pipe', 'pipe'],
-			windowsHide: true
-		});
-
-		return proc;
+	startLiveFeed(onFrame: (buf: Buffer) => void): boolean {
+		return false;
 	}
 
 	async stopLiveFeed(): Promise<void> {
-		if (this._ffmpeg) {
-			this._ffmpeg.kill('SIGTERM');
-			this._ffmpeg = null;
-		}
+		// no-op
 	}
 
 	async disconnect(): Promise<void> {

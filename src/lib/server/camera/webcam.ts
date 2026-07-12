@@ -2,7 +2,6 @@ import { execSync } from 'child_process';
 import { readFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import type { ChildProcess } from 'child_process';
 import type { CameraDriver } from './driver';
 
 export class WebcamDriver implements CameraDriver {
@@ -48,8 +47,8 @@ export class WebcamDriver implements CameraDriver {
 		this._device = undefined;
 	}
 
-	startLiveFeed(): ChildProcess | null {
-		return null;
+	startLiveFeed(_onFrame: (buf: Buffer) => void): boolean {
+		return false;
 	}
 
 	async stopLiveFeed(): Promise<void> {

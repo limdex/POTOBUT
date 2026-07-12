@@ -1,5 +1,5 @@
 import { execSync, spawn, type ChildProcess } from 'child_process';
-import { readFileSync, unlinkSync, existsSync } from 'fs';
+import { readFileSync, openSync, readSync as fsReadSync, closeSync, statSync, unlinkSync, existsSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import type { CameraDriver } from './driver';
@@ -10,13 +10,34 @@ function toMsysPath(p: string): string {
 
 const GPHOTO_ENV = { ...process.env, MSYS_NO_PATHCONV: '1' } as Record<string, string>;
 
+const SOI = Buffer.from([0xFF, 0xD8]);
+const EOI = Buffer.from([0xFF, 0xD9]);
+
+function extractLastJpeg(buf: Buffer): Buffer | null {
+	let last: Buffer | null = null;
+	let pos = 0;
+	while (pos < buf.length) {
+		const soi = buf.indexOf(SOI, pos);
+		if (soi === -1) break;
+		const eoi = buf.indexOf(EOI, soi + 2);
+		if (eoi === -1) break;
+		const frame = Buffer.from(buf.subarray(soi, eoi + 2));
+		if (frame.length > 500) last = frame;
+		pos = eoi + 2;
+	}
+	return last;
+}
+
 export class Gphoto2Driver implements CameraDriver {
 	readonly name = 'gphoto2 (Canon/Nikon/Sony DSLR)';
 	private _port?: string;
 	private _model?: string;
 	private _liveProcess: ChildProcess | null = null;
+	private _pollId: ReturnType<typeof setInterval> | null = null;
+	private _lastReadOffset = 0;
 	private _photoPath = join(tmpdir(), 'potobut-photo.jpg');
 	private _photoPathMsys = toMsysPath(join(tmpdir(), 'potobut-photo.jpg'));
+	private _frameLogCount = 0;
 
 	async detect(): Promise<boolean> {
 		try {
@@ -39,7 +60,7 @@ export class Gphoto2Driver implements CameraDriver {
 				execSync('gphoto2 --reset', { timeout: 5000, env: GPHOTO_ENV, stdio: 'ignore' });
 				console.log('[CAMERA] USB reset OK');
 			} catch {
-				// reset may not be supported, that's fine
+				// reset may not be supported
 			}
 			return true;
 		} catch {
@@ -59,24 +80,75 @@ export class Gphoto2Driver implements CameraDriver {
 		this._model = undefined;
 	}
 
-	startLiveFeed(): ChildProcess | null {
-		if (!this._port) return null;
+	startLiveFeed(onFrame: (buf: Buffer) => void): boolean {
+		if (!this._port) return false;
+
+		const moviePath = join(tmpdir(), 'movie.mjpg');
+		try { unlinkSync(moviePath); } catch { /* */ }
 
 		const proc = spawn('gphoto2', [
 			'--capture-movie=999999',
-			'--stdout',
+			'--force-overwrite',
 			'--quiet'
 		], {
 			stdio: ['ignore', 'pipe', 'pipe'],
 			windowsHide: true,
-			env: GPHOTO_ENV
+			env: GPHOTO_ENV,
+			cwd: tmpdir()
 		});
 
 		this._liveProcess = proc;
-		return proc;
+		this._lastReadOffset = 0;
+		this._frameLogCount = 0;
+
+		let stderrBuf = '';
+		proc.stderr?.on('data', (d: Buffer) => { stderrBuf += d.toString(); });
+
+		proc.on('exit', (code) => {
+			if (code !== 0 && this._frameLogCount < 3) {
+				console.log('[CAMERA] Movie process exited code', code, stderrBuf.trim() ? `stderr: ${stderrBuf.trim()}` : '');
+				this._frameLogCount++;
+			}
+		});
+
+		this._pollId = setInterval(() => {
+			try {
+				if (!existsSync(moviePath)) return;
+
+				const stat = statSync(moviePath);
+				const fileSize = stat.size;
+				if (fileSize <= this._lastReadOffset) return;
+
+				const readSize = fileSize - this._lastReadOffset;
+				const buf = Buffer.alloc(readSize);
+				const fd = openSync(moviePath, 'r');
+				fsReadSync(fd, buf, 0, readSize, this._lastReadOffset);
+				closeSync(fd);
+				this._lastReadOffset = fileSize;
+
+				const jpeg = extractLastJpeg(buf);
+				if (jpeg) {
+					if (this._frameLogCount < 2) {
+						console.log('[CAMERA] Frame OK, size:', jpeg.length, 'bytes');
+						this._frameLogCount++;
+					}
+					onFrame(jpeg);
+				}
+			} catch {
+				// File locked or removed, skip this cycle
+			}
+		}, 100);
+
+		console.log('[CAMERA] Live feed started (file polling)');
+		return true;
 	}
 
 	async stopLiveFeed(): Promise<void> {
+		if (this._pollId) {
+			clearInterval(this._pollId);
+			this._pollId = null;
+		}
+
 		if (!this._liveProcess) return;
 
 		const proc = this._liveProcess;
@@ -91,6 +163,7 @@ export class Gphoto2Driver implements CameraDriver {
 
 			setTimeout(() => {
 				if (!resolved) {
+					console.log('[CAMERA] Movie process not exiting, force kill');
 					try { proc.kill('SIGKILL'); } catch { /* */ }
 					done();
 				}

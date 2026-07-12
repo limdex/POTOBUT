@@ -124,8 +124,8 @@ export class DigiCamControlDriver implements CameraDriver {
 		this._connected = false;
 	}
 
-	startLiveFeed(): ChildProcess | null {
-		return null;
+	startLiveFeed(_onFrame: (buf: Buffer) => void): boolean {
+		return false;
 	}
 
 	async stopLiveFeed(): Promise<void> {
