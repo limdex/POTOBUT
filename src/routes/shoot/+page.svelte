@@ -31,6 +31,8 @@
 		phase = 'countdown';
 		countdown = 5;
 		timerId = setTimeout(tick, 1000);
+		// Stop live feed during countdown so camera is ready for capture
+		fetch('/api/camera/prepare-capture', { method: 'POST' }).catch(() => {});
 	}
 
 	function tick() {

@@ -170,12 +170,20 @@ export class Gphoto2Driver implements CameraDriver {
 			}, 5000);
 		});
 
-		await new Promise(r => setTimeout(r, 500));
+		// Force camera out of live view with multiple resets
+		await new Promise(r => setTimeout(r, 1000));
 		try {
 			execSync('gphoto2 --reset', { timeout: 10000, env: GPHOTO_ENV, stdio: 'ignore' });
-			console.log('[CAMERA] USB reset after stop');
+			console.log('[CAMERA] USB reset 1/2 OK');
 		} catch (e: any) {
-			console.log('[CAMERA] USB reset after stop failed:', e?.message);
+			console.log('[CAMERA] USB reset 1/2 failed:', e?.message);
+		}
+		await new Promise(r => setTimeout(r, 2000));
+		try {
+			execSync('gphoto2 --reset', { timeout: 10000, env: GPHOTO_ENV, stdio: 'ignore' });
+			console.log('[CAMERA] USB reset 2/2 OK');
+		} catch (e: any) {
+			console.log('[CAMERA] USB reset 2/2 failed:', e?.message);
 		}
 	}
 
