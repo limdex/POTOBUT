@@ -70,15 +70,13 @@
 		console.log('[SHOOT] Photo added, total:', shootState.capturedPhotos.length);
 		setTimeout(() => {
 			flash = false;
-			if (currentShot < totalShots - 1) {
-				currentShot++;
-				countdown = 5;
-				timerId = setTimeout(tick, 1000);
-			} else {
+			currentShot++;
+			if (currentShot >= totalShots) {
 				phase = 'done';
 				timerId = undefined;
+			} else {
+				phase = 'ready';
 			}
-			// bump key to reload live feed <img> after capture (camera was locked)
 			liveFeedKey++;
 		}, 400);
 	}
@@ -113,7 +111,7 @@
 
 		{#if phase === 'ready'}
 			<div class="viewfinder-content">
-				<p class="shot-label">Siap?</p>
+				<p class="shot-label">Potret {currentShot + 1} / {data.template?.slot_count}</p>
 				<button class="btn" onclick={startCountdown}>Mulai</button>
 			</div>
 		{:else if phase === 'countdown'}
