@@ -20,15 +20,26 @@ export async function connectPrinter(name?: string): Promise<PrinterInfo> {
 	try {
 		let printers: string[] = [];
 
+		// Primary: PowerShell Get-Printer (modern, Win10/11, works on 24H2 where wmic is removed)
 		try {
-			const out = execSync('wmic printer get name 2>&1', { timeout: 5000 }).toString();
-			printers = out.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('Name') && l !== '');
+			const psOut = execSync(
+				'powershell -NoProfile -Command "Get-Printer | Select-Object -ExpandProperty Name"',
+				{ timeout: 5000, encoding: 'utf8', windowsHide: true }
+			).trim();
+			printers = psOut.split('\n').map(l => l.trim()).filter(Boolean);
 		} catch {
+			// Fallback 1: wmic (legacy Windows)
 			try {
-				const out = execSync('lpstat -e 2>&1', { timeout: 5000 }).toString();
-				printers = out.split('\n').map(l => l.trim()).filter(Boolean);
+				const out = execSync('wmic printer get name 2>&1', { timeout: 5000, encoding: 'utf8' }).trim();
+				printers = out.split('\n').map(l => l.trim()).filter(l => l && !/^Name\b/i.test(l));
 			} catch {
-				// fallback: no printer detection available
+				// Fallback 2: lpstat (Linux)
+				try {
+					const out = execSync('lpstat -e 2>&1', { timeout: 5000, encoding: 'utf8' }).trim();
+					printers = out.split('\n').map(l => l.trim()).filter(Boolean);
+				} catch {
+					// no detection method available
+				}
 			}
 		}
 
