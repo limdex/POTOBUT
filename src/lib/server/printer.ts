@@ -101,7 +101,7 @@ $doc.Print()
 $img.Dispose()
 `;
 			writeFileSync(psPath, psScript);
-			execSync(`powershell -NoProfile -File "${psPath}"`, { timeout: 60000 });
+			execSync(`powershell -NoProfile -ExecutionPolicy Bypass -File "${psPath}"`, { timeout: 60000 });
 		} else {
 			execSync(`lp -d "${_printer.name}" "${tempPath}"`, { timeout: 30000 });
 		}
