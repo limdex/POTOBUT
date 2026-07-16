@@ -119,10 +119,15 @@ if (!pnpOutput || pnpOutput.trim() === '') {
         fail('Could not parse camera device info');
         hasErrors = true;
     } else {
+        const seen = new Set();
         for (const dev of devices) {
             const vidPid = dev.instanceId.match(/VID_([0-9A-F]+)&PID_([0-9A-F]+)/i);
             const vid = vidPid ? vidPid[1] : null;
             const pid = vidPid ? vidPid[2] : null;
+            
+            const dedupeKey = `${vid}:${pid}`;
+            if (seen.has(dedupeKey)) continue;
+            seen.add(dedupeKey);
             
             ok(`${dev.name} — Status: ${dev.status}, VID: ${vid}, PID: ${pid}`);
             

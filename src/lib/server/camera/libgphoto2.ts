@@ -36,7 +36,6 @@ export class Libgphoto2Driver implements CameraDriver {
 
 	async detect(): Promise<boolean> {
 		try {
-			const bash = join('C:', 'msys64', 'usr', 'bin', 'bash.exe');
 			const workerPath = toMsysPath(join(process.cwd(), 'src', 'lib', 'server', 'camera', 'gphoto2-worker.cjs'));
 
 			console.log('[libgphoto2] Spawning worker:', workerPath);
@@ -51,12 +50,14 @@ export class Libgphoto2Driver implements CameraDriver {
 
 				const timeout = setTimeout(() => done(false), 15000);
 
-				const msys2Shell = join('C:', 'msys64', 'msys2_shell.cmd');
+				const bash = join('C:', 'msys64', 'usr', 'bin', 'bash.exe');
 				const nodeExe = toMsysPath(process.execPath);
+				const msysCwd = toMsysPath(process.cwd());
 				console.log('[libgphoto2] Node:', nodeExe);
-				this._proc = spawn('cmd.exe', ['/c', msys2Shell, '-mingw64', '-defterm', '-no-start', '-here', '-c', `"${nodeExe}" "${workerPath}"`], {
+				this._proc = spawn(bash, ['--login', '-c', `cd "${msysCwd}" && "${nodeExe}" "${workerPath}"`], {
 					stdio: ['pipe', 'pipe', 'pipe'],
 					windowsHide: true,
+					env: { ...process.env, MSYSTEM: 'MINGW64' },
 					cwd: process.cwd()
 				});
 
