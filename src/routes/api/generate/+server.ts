@@ -36,7 +36,12 @@ export async function POST({ request }) {
 		const t = (transforms && transforms[i]) || { scale: 1, offsetX: 0, offsetY: 0 };
 		const scale = Math.max(1, Math.min(3, t.scale || 1));
 
-		const photoBuffer = Buffer.from(photoData.split(',')[1], 'base64');
+		const commaIdx = photoData.indexOf(',');
+		if (commaIdx === -1) {
+			console.log('[generate] Skipping photo — no comma in data, starts with:', photoData.substring(0, 80));
+			continue;
+		}
+		const photoBuffer = Buffer.from(photoData.substring(commaIdx + 1), 'base64');
 
 		const scaledW = Math.round(slot.width * scale);
 		const scaledH = Math.round(slot.height * scale);
