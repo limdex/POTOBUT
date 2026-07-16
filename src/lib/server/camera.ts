@@ -1,6 +1,7 @@
 import type { CameraDriver } from './camera/driver';
-import { EdsdkDriver } from './camera/edsdk';
-import { Gphoto2Driver } from './camera/gphoto2';
+import { Libgphoto2Driver } from './camera/libgphoto2';
+// import { Gphoto2Driver } from './camera/gphoto2'; // CLI — diganti libgphoto2 FFI
+// import { EdsdkDriver } from './camera/edsdk'; // EDSDK — diganti libgphoto2 FFI
 import { WindowsCameraDriver } from './camera/windows';
 import { WebcamDriver } from './camera/webcam';
 import { GoProDriver } from './camera/gopro';
@@ -13,18 +14,23 @@ export interface CameraInfo {
 }
 
 const drivers: CameraDriver[] = [
-	new EdsdkDriver(),
-	new Gphoto2Driver(),
+	new Libgphoto2Driver(),
+	// new Gphoto2Driver(), // CLI gphoto2 — dikomen, sekarang pake libgphoto2 FFI
+	// new EdsdkDriver('native/EDSDK.dll', 'v13'), // EDSDK v13 — 750D+
+	// new EdsdkDriver('native/edsdk_v3/EDSDK.dll', 'v3'), // EDSDK v3 — 550D
 	new WindowsCameraDriver(),
 	new WebcamDriver(),
 	new GoProDriver()
 ];
 
-let _activeDriver: CameraDriver | null = null;
-let _info: CameraInfo = { connected: false };
+const _g = globalThis as any;
+let _activeDriver: CameraDriver | null = _g.__camDriver ?? null;
+let _info: CameraInfo = _g.__camInfo ?? { connected: false };
 let _capturing = false;
 let _liveFeedActive = false;
-const _subscribers = new Set<(buf: Buffer) => void>();
+const _subscribers: Set<(buf: Buffer) => void> = _g.__camSubs ?? new Set();
+
+_g.__camSubs = _subscribers;
 
 export function getCameraStatus(): CameraInfo {
 	return { ..._info };
@@ -86,12 +92,16 @@ export async function connectCamera(): Promise<CameraInfo> {
 		if (ok) {
 			_activeDriver = driver;
 			_info = makeInfo(driver, true);
+			_g.__camDriver = _activeDriver;
+			_g.__camInfo = _info;
 			return getCameraStatus();
 		}
 	}
 
 	_activeDriver = null;
 	_info = makeInfo(null, false, 'No compatible camera found');
+	_g.__camDriver = _activeDriver;
+	_g.__camInfo = _info;
 	return getCameraStatus();
 }
 
@@ -102,14 +112,14 @@ export async function disconnectCamera(): Promise<CameraInfo> {
 		_activeDriver = null;
 	}
 	_info = { connected: false };
+	_g.__camDriver = _activeDriver;
+	_g.__camInfo = _info;
 	return getCameraStatus();
 }
 
 export async function prepareCapture(): Promise<void> {
-	if (_liveFeedActive) {
-		console.log('[CAMERA] Prepare capture — stopping live feed...');
-		stopLiveFeed(); // fire and forget — runs during countdown
-	}
+	// Live feed stays on during countdown.
+	// capturePhoto does a fast stop+wait just before the shutter.
 }
 
 export async function capturePhoto(): Promise<ArrayBuffer | null> {
@@ -124,9 +134,6 @@ export async function capturePhoto(): Promise<ArrayBuffer | null> {
 	if (hadLiveFeed) {
 		console.log('[CAMERA] Stopping live feed for capture...');
 		await stopLiveFeed();
-		await new Promise(r => setTimeout(r, 1000));
-	} else {
-		await new Promise(r => setTimeout(r, 500));
 	}
 
 	try {

@@ -25,14 +25,11 @@
 
 	let timerId: ReturnType<typeof setTimeout> | undefined;
 	let cameraConnected = $state(false);
-	let liveFeedKey = $state(0);
 
 	function startCountdown() {
 		phase = 'countdown';
 		countdown = 5;
 		timerId = setTimeout(tick, 1000);
-		// Stop live feed during countdown so camera is ready for capture
-		fetch('/api/camera/prepare-capture', { method: 'POST' }).catch(() => {});
 	}
 
 	function tick() {
@@ -50,26 +47,17 @@
 		flash = true;
 		let photoData: string;
 		if (cameraConnected) {
-			console.log('[SHOOT] Capturing photo from camera...');
 			const res = await fetch('/api/camera/capture', { method: 'POST' });
 			if (res.ok) {
 				const blob = await res.blob();
-				console.log('[SHOOT] Capture success, blob size:', blob.size, 'bytes');
-				photoData = await new Promise<string>((resolve) => {
-					const reader = new FileReader();
-					reader.onload = () => resolve(reader.result as string);
-					reader.readAsDataURL(blob);
-				});
+				photoData = URL.createObjectURL(blob);
 			} else {
-				console.log('[SHOOT] Capture failed, using placeholder');
 				photoData = generatePlaceholder();
 			}
 		} else {
-			console.log('[SHOOT] Camera not connected, using placeholder');
 			photoData = generatePlaceholder();
 		}
 		shootState.addPhoto(photoData);
-		console.log('[SHOOT] Photo added, total:', shootState.capturedPhotos.length);
 		setTimeout(() => {
 			flash = false;
 			currentShot++;
@@ -79,24 +67,28 @@
 			} else {
 				phase = 'ready';
 			}
-			liveFeedKey++;
-		}, 400);
+		}, 200);
 	}
 
 	onMount(() => {
-		console.log('[SHOOT] Checking camera status...');
 		fetch('/api/camera').then(r => r.json()).then(status => {
-			console.log('[SHOOT] Camera status:', status);
 			cameraConnected = status.connected;
-		}).catch(err => {
-			console.error('[SHOOT] Error checking camera:', err);
-		});
+		}).catch(() => {});
 	});
 
 	onDestroy(() => {
 		if (timerId) clearTimeout(timerId);
 	});
+
+	function handleKeydown(e: KeyboardEvent) {
+		if (e.code === 'Space' && phase === 'ready') {
+			e.preventDefault();
+			startCountdown();
+		}
+	}
 </script>
+
+<svelte:window onkeydown={handleKeydown} />
 
 <svelte:head>
 	<title>Memotret — potobut</title>
@@ -105,7 +97,7 @@
 <div class="page">
 	<div class="viewfinder">
 		{#if cameraConnected}
-			<img src={`/api/camera/live-feed?t=${liveFeedKey}`} class="camera-bg" alt="" />
+			<img src="/api/camera/live-feed" class="camera-bg" alt="" />
 		{/if}
 		{#if flash}
 			<div class="flash-overlay"></div>
@@ -183,7 +175,7 @@
 		position: absolute;
 		inset: 0;
 		background: #fff;
-		animation: flash 0.4s ease-out;
+		animation: flash 0.2s ease-out;
 		z-index: 10;
 	}
 	@keyframes flash {
