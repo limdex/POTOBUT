@@ -50,7 +50,11 @@
 			const res = await fetch('/api/camera/capture', { method: 'POST' });
 			if (res.ok) {
 				const blob = await res.blob();
-				photoData = URL.createObjectURL(blob);
+				photoData = await new Promise<string>((resolve) => {
+					const reader = new FileReader();
+					reader.onload = () => resolve(reader.result as string);
+					reader.readAsDataURL(blob);
+				});
 			} else {
 				photoData = generatePlaceholder();
 			}
