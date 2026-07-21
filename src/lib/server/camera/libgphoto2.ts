@@ -126,17 +126,8 @@ export class Libgphoto2Driver implements CameraDriver {
 	async connect(): Promise<boolean> {
 		if (!this._ready || !this._proc) return false;
 
-		// Apply settings
-		const settings = [
-			{ cmd: 'config', key: 'iso', value: '400' },
-			{ cmd: 'config', key: 'aperture', value: '5.6' },
-			{ cmd: 'config', key: 'shutterspeed', value: '1/125' },
-			{ cmd: 'config', key: 'whitebalance', value: 'Flash' },
-		];
-		for (const s of settings) {
-			await this._send(s);
-		}
-
+		// Camera is in Manual mode — exposure controlled via physical dials.
+		// No software override; respect user's physical settings on the camera body.
 		console.log('[libgphoto2] Connected');
 		return true;
 	}
