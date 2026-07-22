@@ -6,7 +6,7 @@
 	"scripts": {
 		"dev": "node scripts/check-camera.cjs && vite dev",
 		"build": "vite build",
-		"preview": "node scripts/check-camera.cjs && vite preview",
+		"preview": "node scripts/check-camera.cjs && node build",
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",

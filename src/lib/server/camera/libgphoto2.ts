@@ -36,7 +36,7 @@ export class Libgphoto2Driver implements CameraDriver {
 
 	async detect(): Promise<boolean> {
 		try {
-			const workerPath = toMsysPath(join(process.cwd(), 'src', 'lib', 'server', 'camera', 'gphoto2-worker.cjs'));
+			const workerPath = toMsysPath(join(process.cwd(), 'scripts', 'gphoto2-worker.cjs'));
 
 			console.log('[libgphoto2] Spawning worker:', workerPath);
 
