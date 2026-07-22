@@ -36,6 +36,8 @@
 
 	let selectedPaper: 'a4' | '4r' | null = $state(null);
 	let showPaperModal = $state(false);
+	let templateOffX = $state(0);
+	let templateOffY = $state(0);
 
 	function showToast(message: string, type: 'success' | 'error') {
 		if (toastTimer) clearTimeout(toastTimer);
@@ -81,10 +83,12 @@
 		}
 		const paper = paperSizes[selectedPaper];
 		const s = Math.min(paper.width / template.canvas_width, paper.height / template.canvas_height);
+		const totalOx = (paper.width - template.canvas_width * s) / 2 + templateOffX;
+		const totalOy = (paper.height - template.canvas_height * s) / 2 + templateOffY;
 		return {
 			scale: s,
-			ox: (paper.width - template.canvas_width * s) / 2,
-			oy: (paper.height - template.canvas_height * s) / 2,
+			ox: totalOx,
+			oy: totalOy,
 			paperW: paper.width,
 			paperH: paper.height,
 		};
@@ -194,7 +198,22 @@
 		const pos = canvasPos(e);
 		const idx = slotAtPos(pos);
 		if (idx === null) {
+			if (!selectedPaper) {
+				selectedSlot = null;
+				scheduleDraw();
+				return;
+			}
+			const pt = getPaperTransform();
+			const rect = canvasEl!.getBoundingClientRect();
+			const sx = pt.paperW / rect.width;
+			const sy = pt.paperH / rect.height;
 			selectedSlot = null;
+			dragging = true;
+			dragStartX = (e.clientX - rect.left) * sx;
+			dragStartY = (e.clientY - rect.top) * sy;
+			dragStartOffX = templateOffX;
+			dragStartOffY = templateOffY;
+			canvasEl!.setPointerCapture(e.pointerId);
 			scheduleDraw();
 			return;
 		}
@@ -210,15 +229,27 @@
 	}
 
 	function handlePointerMove(e: PointerEvent) {
-		if (!dragging || selectedSlot === null) return;
-		const pos = canvasPos(e);
-		const dx = pos.x - dragStartX;
-		const dy = pos.y - dragStartY;
-		const t = transforms[selectedSlot];
-		const maxX = (slots[selectedSlot].width * t.scale - slots[selectedSlot].width) / 2;
-		const maxY = (slots[selectedSlot].height * t.scale - slots[selectedSlot].height) / 2;
-		t.offsetX = Math.max(-maxX, Math.min(maxX, dragStartOffX + dx));
-		t.offsetY = Math.max(-maxY, Math.min(maxY, dragStartOffY + dy));
+		if (!dragging) return;
+		if (selectedSlot === null) {
+			if (!selectedPaper) return;
+			const pt = getPaperTransform();
+			const rect = canvasEl!.getBoundingClientRect();
+			const sx = pt.paperW / rect.width;
+			const sy = pt.paperH / rect.height;
+			const px = (e.clientX - rect.left) * sx;
+			const py = (e.clientY - rect.top) * sy;
+			templateOffX = dragStartOffX + (px - dragStartX);
+			templateOffY = dragStartOffY + (py - dragStartY);
+		} else {
+			const pos = canvasPos(e);
+			const dx = pos.x - dragStartX;
+			const dy = pos.y - dragStartY;
+			const t = transforms[selectedSlot];
+			const maxX = (slots[selectedSlot].width * t.scale - slots[selectedSlot].width) / 2;
+			const maxY = (slots[selectedSlot].height * t.scale - slots[selectedSlot].height) / 2;
+			t.offsetX = Math.max(-maxX, Math.min(maxX, dragStartOffX + dx));
+			t.offsetY = Math.max(-maxY, Math.min(maxY, dragStartOffY + dy));
+		}
 		scheduleDraw();
 	}
 
@@ -232,8 +263,12 @@
 		if (idx !== null) {
 			transforms[idx] = { scale: 1, offsetX: 0, offsetY: 0 };
 			selectedSlot = idx;
-			scheduleDraw();
+		} else if (selectedPaper) {
+			templateOffX = 0;
+			templateOffY = 0;
+			selectedSlot = null;
 		}
+		scheduleDraw();
 	}
 
 	function handleWheel(e: WheelEvent) {
@@ -345,8 +380,7 @@
 	</div>
 
 	<button class="paper-btn" onclick={() => showPaperModal = true}>
-		<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h5"/></svg>
-		{selectedPaper ? paperSizes[selectedPaper].label : 'Pilih Kertas'}
+		Pilih Kertas
 	</button>
 
 	{#if !ready}
@@ -434,6 +468,10 @@
 				</div>
 			</div>
 		</div>
+	{/if}
+
+	{#if selectedPaper}
+		<div class="paper-label-bot">Kertas: {paperSizes[selectedPaper].label}</div>
 	{/if}
 </div>
 
@@ -605,9 +643,6 @@
 		position: absolute;
 		bottom: 1rem;
 		right: 1rem;
-		display: flex;
-		align-items: center;
-		gap: 0.4rem;
 		padding: 0.5rem 1rem;
 		font-size: 0.8rem;
 		font-weight: 600;
@@ -622,6 +657,15 @@
 	.paper-btn:hover {
 		background: rgba(255,255,255,0.12);
 		color: #fff;
+	}
+
+	.paper-label-bot {
+		position: absolute;
+		bottom: 1rem;
+		left: 1rem;
+		font-size: 0.75rem;
+		color: #6b7280;
+		z-index: 10;
 	}
 
 	.modal-overlay {
