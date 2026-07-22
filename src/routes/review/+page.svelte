@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { shootState } from '$lib/stores/shoot.svelte';
+	import { paperSizes } from '$lib/data/paper-sizes';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -32,6 +33,9 @@
 
 	let toast = $state<{ message: string; type: 'success' | 'error' } | null>(null);
 	let toastTimer: ReturnType<typeof setTimeout> | undefined;
+
+	let selectedPaper: 'a4' | '4r' | null = $state(null);
+	let showPaperModal = $state(false);
 
 	function showToast(message: string, type: 'success' | 'error') {
 		if (toastTimer) clearTimeout(toastTimer);
@@ -71,13 +75,37 @@
 		});
 	}
 
+	function getPaperTransform() {
+		if (!selectedPaper) {
+			return { scale: 1, ox: 0, oy: 0, paperW: template.canvas_width, paperH: template.canvas_height };
+		}
+		const paper = paperSizes[selectedPaper];
+		const s = Math.min(paper.width / template.canvas_width, paper.height / template.canvas_height);
+		return {
+			scale: s,
+			ox: (paper.width - template.canvas_width * s) / 2,
+			oy: (paper.height - template.canvas_height * s) / 2,
+			paperW: paper.width,
+			paperH: paper.height,
+		};
+	}
+
 	function drawCanvas() {
 		if (!canvasEl) return;
 		const ctx = canvasEl.getContext('2d', { willReadFrequently: false })!;
+		const pt = getPaperTransform();
+		canvasEl.width = pt.paperW;
+		canvasEl.height = pt.paperH;
+
+		ctx.fillStyle = '#ffffff';
+		ctx.fillRect(0, 0, pt.paperW, pt.paperH);
+
+		ctx.save();
+		ctx.translate(pt.ox, pt.oy);
+		ctx.scale(pt.scale, pt.scale);
+
 		const cw = template.canvas_width;
 		const ch = template.canvas_height;
-		canvasEl.width = cw;
-		canvasEl.height = ch;
 
 		if (bgImg) {
 			drawImageCover(ctx, bgImg, 0, 0, cw, ch);
@@ -135,15 +163,20 @@
 			ctx.strokeRect(s.x, s.y, s.width, s.height);
 			ctx.restore();
 		}
+
+		ctx.restore();
 	}
 
 	function canvasPos(e: PointerEvent | MouseEvent): { x: number; y: number } {
 		const rect = canvasEl!.getBoundingClientRect();
-		const sx = canvasEl!.width / rect.width;
-		const sy = canvasEl!.height / rect.height;
+		const pt = getPaperTransform();
+		const sx = pt.paperW / rect.width;
+		const sy = pt.paperH / rect.height;
+		const px = (e.clientX - rect.left) * sx;
+		const py = (e.clientY - rect.top) * sy;
 		return {
-			x: (e.clientX - rect.left) * sx,
-			y: (e.clientY - rect.top) * sy
+			x: (px - pt.ox) / pt.scale,
+			y: (py - pt.oy) / pt.scale
 		};
 	}
 
@@ -236,7 +269,8 @@
 				body: JSON.stringify({
 					templateId: template.id,
 					photos: shootState.capturedPhotos.map(p => ({ data: p.data })),
-					transforms
+					transforms,
+					paperSize: selectedPaper ?? undefined
 				})
 			});
 			if (!res.ok) throw new Error('Gagal generate');
@@ -310,6 +344,11 @@
 		<button class="btn" onclick={cetak} disabled={mencetak || !ready}>{mencetak ? 'Memproses...' : 'Cetak'}</button>
 	</div>
 
+	<button class="paper-btn" onclick={() => showPaperModal = true}>
+		<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h5"/></svg>
+		{selectedPaper ? paperSizes[selectedPaper].label : 'Pilih Kertas'}
+	</button>
+
 	{#if !ready}
 		<div class="loading">Memproses...</div>
 	{:else if loadError}
@@ -353,6 +392,48 @@
 		{#if toast}
 			<div class="toast {toast.type}">{toast.message}</div>
 		{/if}
+	{/if}
+
+	{#if showPaperModal}
+		<div class="modal-overlay" onclick={() => showPaperModal = false}>
+			<div class="modal-panel" onclick={(e) => e.stopPropagation()}>
+				<div class="modal-header">
+					<h3>Pilih Kertas</h3>
+					<button class="modal-close" onclick={() => showPaperModal = false}>
+						<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+					</button>
+				</div>
+				<div class="paper-options">
+					{#each Object.entries(paperSizes) as [key, ps]}
+						<button
+							class="paper-card"
+							class:selected={selectedPaper === key}
+							onclick={() => { selectedPaper = key as 'a4' | '4r'; showPaperModal = false; scheduleDraw(); }}
+						>
+							<div class="paper-preview" style="aspect-ratio: {ps.width / ps.height}">
+								<div class="paper-outline">
+									<span class="paper-label">{ps.label}</span>
+								</div>
+							</div>
+							<span class="paper-name">{ps.label}</span>
+							<span class="paper-dims">{Math.round((ps.width * 25.4) / 300)} × {Math.round((ps.height * 25.4) / 300)} mm</span>
+						</button>
+					{/each}
+					<button
+						class="paper-card"
+						class:selected={selectedPaper === null}
+						onclick={() => { selectedPaper = null; showPaperModal = false; scheduleDraw(); }}
+					>
+						<div class="paper-preview" style="aspect-ratio: {template.canvas_width / template.canvas_height}">
+							<div class="paper-outline">
+								<span class="paper-label">Template</span>
+							</div>
+						</div>
+						<span class="paper-name">Tanpa Kertas</span>
+					</button>
+				</div>
+			</div>
+		</div>
 	{/if}
 </div>
 
@@ -518,5 +599,133 @@
 	@keyframes toast-in {
 		from { opacity: 0; transform: translateX(-50%) translateY(-8px); }
 		to { opacity: 1; transform: translateX(-50%) translateY(0); }
+	}
+
+	.paper-btn {
+		position: absolute;
+		bottom: 1rem;
+		right: 1rem;
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+		padding: 0.5rem 1rem;
+		font-size: 0.8rem;
+		font-weight: 600;
+		border: 1px solid rgba(255,255,255,0.15);
+		border-radius: 8px;
+		background: rgba(255,255,255,0.06);
+		color: #d1d5db;
+		cursor: pointer;
+		z-index: 10;
+		transition: all 0.15s;
+	}
+	.paper-btn:hover {
+		background: rgba(255,255,255,0.12);
+		color: #fff;
+	}
+
+	.modal-overlay {
+		position: absolute;
+		inset: 0;
+		background: rgba(0,0,0,0.7);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		z-index: 30;
+		animation: fade-in 0.15s ease-out;
+	}
+	@keyframes fade-in {
+		from { opacity: 0; }
+		to { opacity: 1; }
+	}
+	.modal-panel {
+		background: #1f2937;
+		border-radius: 14px;
+		padding: 1.5rem;
+		max-width: 440px;
+		width: 90%;
+		animation: modal-in 0.2s ease-out;
+	}
+	@keyframes modal-in {
+		from { opacity: 0; transform: scale(0.95); }
+		to { opacity: 1; transform: scale(1); }
+	}
+	.modal-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		margin-bottom: 1.25rem;
+	}
+	.modal-header h3 {
+		margin: 0;
+		font-size: 1rem;
+		color: #fff;
+	}
+	.modal-close {
+		background: none;
+		border: none;
+		color: #6b7280;
+		cursor: pointer;
+		padding: 0.25rem;
+		border-radius: 6px;
+		transition: all 0.15s;
+	}
+	.modal-close:hover {
+		color: #fff;
+		background: rgba(255,255,255,0.08);
+	}
+
+	.paper-options {
+		display: flex;
+		gap: 0.75rem;
+	}
+	.paper-card {
+		flex: 1;
+		border: 2px solid rgba(255,255,255,0.08);
+		border-radius: 10px;
+		background: transparent;
+		padding: 0.75rem;
+		cursor: pointer;
+		transition: all 0.15s;
+		text-align: center;
+		color: #9ca3af;
+	}
+	.paper-card:hover {
+		border-color: rgba(255,255,255,0.2);
+	}
+	.paper-card.selected {
+		border-color: #4f46e5;
+		background: rgba(79,70,229,0.1);
+		color: #fff;
+	}
+	.paper-preview {
+		border: 1.5px dashed rgba(255,255,255,0.15);
+		border-radius: 4px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		margin-bottom: 0.5rem;
+		background: rgba(255,255,255,0.03);
+	}
+	.paper-outline {
+		text-align: center;
+	}
+	.paper-label {
+		font-size: 0.75rem;
+		font-weight: 700;
+		color: inherit;
+		opacity: 0.6;
+	}
+	.paper-name {
+		display: block;
+		font-size: 0.85rem;
+		font-weight: 600;
+		color: inherit;
+	}
+	.paper-dims {
+		display: block;
+		font-size: 0.7rem;
+		color: #6b7280;
+		margin-top: 0.15rem;
 	}
 </style>

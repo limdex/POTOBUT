@@ -1,11 +1,12 @@
 import { error } from '@sveltejs/kit';
 import sharp from 'sharp';
 import { getParsedTemplate } from '$lib/server/db';
+import { paperSizes } from '$lib/data/paper-sizes';
 import fs from 'fs';
 import path from 'path';
 
 export async function POST({ request }) {
-	const { templateId, photos, transforms } = await request.json();
+	const { templateId, photos, transforms, paperSize: paperSizeKey } = await request.json();
 
 	const template = getParsedTemplate(Number(templateId));
 	if (!template) error(400, 'Template not found');
@@ -27,6 +28,13 @@ export async function POST({ request }) {
 	}
 
 	const layers: { input: Buffer; top: number; left: number }[] = [];
+
+	const paperSize = paperSizeKey && paperSizes[paperSizeKey] ? paperSizes[paperSizeKey] : null;
+	const s = paperSize ? Math.min(paperSize.width / tw, paperSize.height / th) : 1;
+	const ox = paperSize ? (paperSize.width - tw * s) / 2 : 0;
+	const oy = paperSize ? (paperSize.height - th * s) / 2 : 0;
+	const pw = paperSize ? paperSize.width : tw;
+	const ph = paperSize ? paperSize.height : th;
 
 	for (let i = 0; i < template.slots.length; i++) {
 		const slot = template.slots[i];
@@ -62,7 +70,15 @@ export async function POST({ request }) {
 			.png()
 			.toBuffer();
 
-		layers.push({ input: extracted, top: Math.round(slot.y), left: Math.round(slot.x) });
+		const scaledLayer = paperSize
+			? await sharp(extracted).resize({ width: Math.round(slot.width * s), height: Math.round(slot.height * s) }).png().toBuffer()
+			: extracted;
+
+		layers.push({
+			input: scaledLayer,
+			top: Math.round(slot.y * s + oy),
+			left: Math.round(slot.x * s + ox),
+		});
 	}
 
 	for (const ov of template.overlays) {
@@ -70,21 +86,24 @@ export async function POST({ request }) {
 		if (!fs.existsSync(ovPath)) continue;
 		const ovBuffer = fs.readFileSync(ovPath);
 		const ovResized = await sharp(ovBuffer)
-			.resize({ width: Math.round(ov.width), height: Math.round(ov.height) })
+			.resize({ width: Math.round(ov.width * s), height: Math.round(ov.height * s) })
 			.png()
 			.toBuffer();
-		layers.push({ input: ovResized, top: Math.round(ov.y), left: Math.round(ov.x) });
+		layers.push({
+			input: ovResized,
+			top: Math.round(ov.y * s + oy),
+			left: Math.round(ov.x * s + ox),
+		});
 	}
 
-	const bg = await sharp(bgBuffer)
-		.resize(tw, th, { fit: 'fill' })
-		.png()
-		.toBuffer();
+	const bg = paperSize
+		? await sharp(bgBuffer).resize({ width: Math.round(tw * s), height: Math.round(th * s), fit: 'fill' }).png().toBuffer()
+		: await sharp(bgBuffer).resize(tw, th, { fit: 'fill' }).png().toBuffer();
 
 	const result = await sharp({
-		create: { width: tw, height: th, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } }
+		create: { width: pw, height: ph, channels: 4, background: { r: 255, g: 255, b: 255, alpha: 1 } }
 	})
-		.composite([{ input: bg, top: 0, left: 0 }, ...layers])
+		.composite([{ input: bg, top: Math.round(oy), left: Math.round(ox) }, ...layers])
 		.png({ compressionLevel: 3 })
 		.toBuffer();
 
