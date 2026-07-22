@@ -305,7 +305,9 @@
 					templateId: template.id,
 					photos: shootState.capturedPhotos.map(p => ({ data: p.data })),
 					transforms,
-					paperSize: selectedPaper ?? undefined
+					paperSize: selectedPaper ?? undefined,
+					templateOffX: templateOffX || 0,
+					templateOffY: templateOffY || 0
 				})
 			});
 			if (!res.ok) throw new Error('Gagal generate');

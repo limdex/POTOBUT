@@ -6,7 +6,7 @@ import fs from 'fs';
 import path from 'path';
 
 export async function POST({ request }) {
-	const { templateId, photos, transforms, paperSize: paperSizeKey } = await request.json();
+	const { templateId, photos, transforms, paperSize: paperSizeKey, templateOffX = 0, templateOffY = 0 } = await request.json();
 
 	const template = getParsedTemplate(Number(templateId));
 	if (!template) error(400, 'Template not found');
@@ -31,8 +31,8 @@ export async function POST({ request }) {
 
 	const paperSize = paperSizeKey && paperSizes[paperSizeKey] ? paperSizes[paperSizeKey] : null;
 	const s = paperSize ? Math.min(paperSize.width / tw, paperSize.height / th) : 1;
-	const ox = paperSize ? (paperSize.width - tw * s) / 2 : 0;
-	const oy = paperSize ? (paperSize.height - th * s) / 2 : 0;
+	const ox = paperSize ? (paperSize.width - tw * s) / 2 + templateOffX : 0;
+	const oy = paperSize ? (paperSize.height - th * s) / 2 + templateOffY : 0;
 	const pw = paperSize ? paperSize.width : tw;
 	const ph = paperSize ? paperSize.height : th;
 
