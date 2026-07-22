@@ -28,8 +28,8 @@ installer/installer-output/
 installer/*.exe
 
 # Database (user data)
-database/
-data/
+/database/
+/data/
 *.db
 *.db-shm
 *.db-wal
