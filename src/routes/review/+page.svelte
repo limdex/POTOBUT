@@ -39,6 +39,12 @@
 	let templateOffX = $state(0);
 	let templateOffY = $state(0);
 
+	$effect(() => {
+		selectedPaper;
+		templateOffX = 0;
+		templateOffY = 0;
+	});
+
 	function showToast(message: string, type: 'success' | 'error') {
 		if (toastTimer) clearTimeout(toastTimer);
 		toast = { message, type };
@@ -58,13 +64,18 @@
 	function drawImageCover(
 		ctx: CanvasRenderingContext2D,
 		img: HTMLImageElement,
-		dx: number, dy: number, dw: number, dh: number
+		dx: number, dy: number, dw: number, dh: number,
+		offX = 0, offY = 0
 	) {
-		const scale = Math.max(dw / img.naturalWidth, dh / img.naturalHeight);
-		const sw = dw / scale;
-		const sh = dh / scale;
-		const sx = (img.naturalWidth - sw) / 2;
-		const sy = (img.naturalHeight - sh) / 2;
+		const s = Math.max(dw / img.naturalWidth, dh / img.naturalHeight);
+		const sw = dw / s;
+		const sh = dh / s;
+		const maxDx = Math.max(0, (img.naturalWidth * s - dw) / 2);
+		const maxDy = Math.max(0, (img.naturalHeight * s - dh) / 2);
+		const ox = Math.max(-maxDx, Math.min(maxDx, offX));
+		const oy = Math.max(-maxDy, Math.min(maxDy, offY));
+		const sx = (img.naturalWidth - sw) / 2 - ox / s;
+		const sy = (img.naturalHeight - sh) / 2 - oy / s;
 		ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
 	}
 
@@ -112,7 +123,7 @@
 		const ch = template.canvas_height;
 
 		if (bgImg) {
-			drawImageCover(ctx, bgImg, 0, 0, cw, ch);
+			drawImageCover(ctx, bgImg, 0, 0, cw, ch, template.bg_offset_x || 0, template.bg_offset_y || 0);
 		} else {
 			ctx.fillStyle = '#1f2937';
 			ctx.fillRect(0, 0, cw, ch);
@@ -645,21 +656,18 @@
 		position: absolute;
 		bottom: 1rem;
 		right: 1rem;
-		padding: 0.5rem 1rem;
-		font-size: 0.8rem;
+		padding: 0.55rem 1.4rem;
+		font-size: 0.85rem;
 		font-weight: 600;
-		border: 1px solid rgba(255,255,255,0.15);
+		border: none;
 		border-radius: 8px;
-		background: rgba(255,255,255,0.06);
-		color: #d1d5db;
+		background: #4f46e5;
+		color: #fff;
 		cursor: pointer;
 		z-index: 10;
-		transition: all 0.15s;
+		transition: opacity 0.15s;
 	}
-	.paper-btn:hover {
-		background: rgba(255,255,255,0.12);
-		color: #fff;
-	}
+	.paper-btn:hover { opacity: 0.9; }
 
 	.paper-label-bot {
 		position: absolute;

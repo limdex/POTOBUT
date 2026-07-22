@@ -17,29 +17,33 @@ export const GET: RequestHandler = async () => {
 export const POST: RequestHandler = async ({ request }) => {
 	const db = getDb();
 	const body = await request.json();
-	const {
-		name = 'Template Baru',
-		canvas_width = 1200,
-		canvas_height = 1800,
-		background_path = '',
-		slot_count = 4,
-		slots = [] as Slot[],
-		overlays = [] as Overlay[]
-	} = body;
+		const {
+			name = 'Template Baru',
+			canvas_width = 1200,
+			canvas_height = 1800,
+			background_path = '',
+			slot_count = 4,
+			slots = [] as Slot[],
+			overlays = [] as Overlay[],
+			bg_offset_x = 0,
+			bg_offset_y = 0
+		} = body;
 
-	const stmt = db.prepare(`
-		INSERT INTO templates (name, canvas_width, canvas_height, background_path, slot_count, slots, overlays)
-		VALUES (?, ?, ?, ?, ?, ?, ?)
-	`);
-	const result = stmt.run(
-		name,
-		canvas_width,
-		canvas_height,
-		background_path,
-		slot_count,
-		JSON.stringify(slots),
-		JSON.stringify(overlays)
-	);
+		const stmt = db.prepare(`
+			INSERT INTO templates (name, canvas_width, canvas_height, background_path, slot_count, slots, overlays, bg_offset_x, bg_offset_y)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`);
+		const result = stmt.run(
+			name,
+			canvas_width,
+			canvas_height,
+			background_path,
+			slot_count,
+			JSON.stringify(slots),
+			JSON.stringify(overlays),
+			bg_offset_x,
+			bg_offset_y
+		);
 
 	const row = db.prepare('SELECT * FROM templates WHERE id = ?').get(result.lastInsertRowid) as any;
 	invalidateTemplateCache(Number(result.lastInsertRowid));

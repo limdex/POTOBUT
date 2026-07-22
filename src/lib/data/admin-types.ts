@@ -24,6 +24,8 @@ export interface TemplateRecord {
 	slot_count: number;
 	slots: Slot[];
 	overlays: Overlay[];
+	bg_offset_x: number;
+	bg_offset_y: number;
 	created_at: string;
 	updated_at: string;
 }

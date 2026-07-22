@@ -36,10 +36,19 @@ function initSchema() {
 			slot_count INTEGER NOT NULL DEFAULT 4,
 			slots TEXT NOT NULL DEFAULT '[]',
 			overlays TEXT NOT NULL DEFAULT '[]',
+			bg_offset_x INTEGER NOT NULL DEFAULT 0,
+			bg_offset_y INTEGER NOT NULL DEFAULT 0,
 			created_at TEXT NOT NULL DEFAULT (datetime('now')),
 			updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 		)
 	`);
+
+	try {
+		db.exec('ALTER TABLE templates ADD COLUMN bg_offset_x INTEGER NOT NULL DEFAULT 0');
+	} catch {}
+	try {
+		db.exec('ALTER TABLE templates ADD COLUMN bg_offset_y INTEGER NOT NULL DEFAULT 0');
+	} catch {}
 }
 
 export function getParsedTemplate(id: number) {

@@ -20,14 +20,16 @@ export const PUT: RequestHandler = async ({ params, request }) => {
 	if (!existing) return json({ error: 'Not found' }, { status: 404 });
 
 	const {
-		name,
-		canvas_width,
-		canvas_height,
-		background_path,
-		slot_count,
-		slots,
-		overlays
-	} = body;
+			name,
+			canvas_width,
+			canvas_height,
+			background_path,
+			slot_count,
+			slots,
+			overlays,
+			bg_offset_x,
+			bg_offset_y
+		} = body;
 
 	const stmt = db.prepare(`
 		UPDATE templates SET
@@ -38,6 +40,8 @@ export const PUT: RequestHandler = async ({ params, request }) => {
 			slot_count = COALESCE(?, slot_count),
 			slots = COALESCE(?, slots),
 			overlays = COALESCE(?, overlays),
+			bg_offset_x = COALESCE(?, bg_offset_x),
+			bg_offset_y = COALESCE(?, bg_offset_y),
 			updated_at = datetime('now')
 		WHERE id = ?
 	`);
@@ -49,6 +53,8 @@ export const PUT: RequestHandler = async ({ params, request }) => {
 		slot_count ?? null,
 		slots ? JSON.stringify(slots) : null,
 		overlays ? JSON.stringify(overlays) : null,
+		bg_offset_x ?? null,
+		bg_offset_y ?? null,
 		Number(params.id)
 	);
 	invalidateTemplateCache(Number(params.id));

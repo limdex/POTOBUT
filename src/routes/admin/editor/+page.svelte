@@ -15,18 +15,45 @@
 	let overlays = $state<Overlay[]>(data.template?.overlays ?? []);
 	let selectedId = $state<string | null>(null);
 	let saving = $state(false);
-	let dragState: { type: 'move' | 'resize' | 'canvas-resize'; elementId?: string; startX: number; startY: number; origX: number; origY: number; origW: number; origH: number; handle?: string } | null = null;
+	let dragState: { type: 'move' | 'resize' | 'canvas-resize' | 'bg-move'; elementId?: string; startX: number; startY: number; origX: number; origY: number; origW: number; origH: number; handle?: string } | null = null;
 	let canvasEl = $state<HTMLDivElement | undefined>(undefined);
 	let canvasScale = $state(1);
 	let confirmDelete = $state<'slots' | 'overlays' | null>(null);
 
 	let nextOverlayId = $state(overlays.length + 1);
 
-	const bgImg = $derived.by(() => {
-		if (!backgroundPath || !browser) return null;
+	let bgNaturalWidth = $state(0);
+	let bgNaturalHeight = $state(0);
+	let bgOffsetX = $state(data.template?.bg_offset_x ?? 0);
+	let bgOffsetY = $state(data.template?.bg_offset_y ?? 0);
+
+	let bgCoverStyle = $derived.by(() => {
+		if (!backgroundPath || !bgNaturalWidth || !bgNaturalHeight || !canvasWidth || !canvasHeight) return '';
+		const s = Math.max(canvasWidth / bgNaturalWidth, canvasHeight / bgNaturalHeight);
+		const w = Math.round(bgNaturalWidth * s);
+		const h = Math.round(bgNaturalHeight * s);
+		const maxDx = Math.max(0, (w - canvasWidth) / 2);
+		const maxDy = Math.max(0, (h - canvasHeight) / 2);
+		const ox = Math.max(-maxDx, Math.min(maxDx, bgOffsetX));
+		const oy = Math.max(-maxDy, Math.min(maxDy, bgOffsetY));
+		const left = Math.round((canvasWidth - w) / 2 + ox);
+		const top = Math.round((canvasHeight - h) / 2 + oy);
+		return `position: absolute; width: ${w}px; height: ${h}px; left: ${left}px; top: ${top}px;`;
+	});
+
+	$effect(() => {
+		if (!backgroundPath || !browser) {
+			bgNaturalWidth = 0;
+			bgNaturalHeight = 0;
+			return;
+		}
 		const img = new Image();
+		img.onload = () => {
+			bgNaturalWidth = img.naturalWidth;
+			bgNaturalHeight = img.naturalHeight;
+		};
 		img.src = backgroundPath;
-		return img;
+		return () => { img.onload = null; };
 	});
 
 	function getCanvasScale() {
@@ -220,18 +247,23 @@
 		const dy = coords.y - dragState.startY;
 
 		const ds = dragState;
-		if (ds.type === 'move') {
+		if (ds.type === 'bg-move') {
+			bgOffsetX = Math.round(ds.origX + dx);
+			bgOffsetY = Math.round(ds.origY + dy);
+		} else if (ds.type === 'move') {
 			const nx = ds.origX + dx;
 			const ny = ds.origY + dy;
+			const eid = ds.elementId;
+			if (!eid) return;
 
-			if (ds.elementId.startsWith('slot-')) {
-				const idx = parseInt(ds.elementId.replace('slot-', '')) - 1;
+			if (eid.startsWith('slot-')) {
+				const idx = parseInt(eid.replace('slot-', '')) - 1;
 				if (idx >= 0 && idx < slots.length) {
 					slots = slots.map((s, i) => i === idx ? { ...s, x: nx, y: ny } : s);
 				}
 			} else {
 				overlays = overlays.map(o =>
-					o.id === ds.elementId ? { ...o, x: nx, y: ny } : o
+					o.id === eid ? { ...o, x: nx, y: ny } : o
 				);
 			}
 		} else if (ds.type === 'resize') {
@@ -266,6 +298,22 @@
 
 	function handlePointerUp() {
 		dragState = null;
+	}
+
+	function handleBgPointerDown(e: PointerEvent) {
+		e.stopPropagation();
+		selectedId = null;
+		const coords = toCanvasCoords(e.clientX, e.clientY);
+		if (!coords) return;
+		dragState = {
+			type: 'bg-move',
+			startX: coords.x,
+			startY: coords.y,
+			origX: bgOffsetX,
+			origY: bgOffsetY,
+			origW: 0,
+			origH: 0
+		};
 	}
 
 	function handleCanvasClick(e: MouseEvent) {
@@ -308,7 +356,9 @@
 			background_path: backgroundPath,
 			slot_count: slots.length,
 			slots,
-			overlays
+			overlays,
+			bg_offset_x: Math.round(bgOffsetX),
+			bg_offset_y: Math.round(bgOffsetY)
 		};
 
 		let res;
@@ -411,7 +461,7 @@
 						class="canvas-inner"
 						style="width: {canvasWidth}px; height: {canvasHeight}px; transform: scale({scale}); transform-origin: top left;"
 					>
-					<img src={backgroundPath} alt="BG" class="bg-img" draggable="false" />
+					<img src={backgroundPath} alt="BG" class="bg-img" draggable="false" style={bgCoverStyle} onpointerdown={(e) => handleBgPointerDown(e)} />
 
 					{#each slots as slot, i}
 						{@const sid = 'slot-' + (i + 1)}
@@ -630,11 +680,10 @@
 		background: #fff;
 	}
 	.bg-img {
+		position: absolute;
 		display: block;
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
-		pointer-events: none;
+		pointer-events: all;
+		cursor: grab;
 	}
 	.slot-el {
 		position: absolute;

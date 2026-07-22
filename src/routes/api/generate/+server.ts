@@ -96,9 +96,31 @@ export async function POST({ request }) {
 		});
 	}
 
-	const bg = paperSize
-		? await sharp(bgBuffer).resize({ width: Math.round(tw * s), height: Math.round(th * s), fit: 'fill' }).png().toBuffer()
-		: await sharp(bgBuffer).resize(tw, th, { fit: 'fill' }).png().toBuffer();
+	let bg: Buffer;
+	if (template.background_path) {
+		const bgMeta = await sharp(bgBuffer).metadata();
+		const bgW = bgMeta.width!;
+		const bgH = bgMeta.height!;
+		const coverS = Math.max(tw / bgW, th / bgH);
+		const displayW = Math.round(bgW * coverS);
+		const displayH = Math.round(bgH * coverS);
+		const maxDx = Math.max(0, (displayW - tw) / 2);
+		const maxDy = Math.max(0, (displayH - th) / 2);
+		const offX = Math.max(-maxDx, Math.min(maxDx, template.bg_offset_x || 0));
+		const offY = Math.max(-maxDy, Math.min(maxDy, template.bg_offset_y || 0));
+		const extractLeft = Math.round(maxDx - offX);
+		const extractTop = Math.round(maxDy - offY);
+		bg = await sharp(bgBuffer)
+			.resize({ width: displayW, height: displayH, fit: 'fill' })
+			.extract({ left: extractLeft, top: extractTop, width: tw, height: th })
+			.png()
+			.toBuffer();
+	} else {
+		bg = await sharp({ create: { width: tw, height: th, channels: 3, background: { r: 0, g: 0, b: 0 } } }).png().toBuffer();
+	}
+	if (paperSize) {
+		bg = await sharp(bg).resize({ width: Math.round(tw * s), height: Math.round(th * s), fit: 'fill' }).png().toBuffer();
+	}
 
 	const result = await sharp({
 		create: { width: pw, height: ph, channels: 4, background: { r: 255, g: 255, b: 255, alpha: 1 } }
