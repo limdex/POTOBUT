@@ -70,6 +70,26 @@ if (existsSync(gphoto2Dll)) {
     hasErrors = true;
 }
 
+// Check critical MINGW64 runtime DLLs
+const runtimeDlls = [
+    { file: 'libwinpthread-1.dll', pkg: 'mingw-w64-x86_64-libwinpthread-git' },
+    { file: 'libintl-8.dll',        pkg: 'mingw-w64-x86_64-gettext' },
+    { file: 'libgcc_s_seh-1.dll',   pkg: 'mingw-w64-x86_64-gcc-libs' },
+    { file: 'libstdc++-6.dll',      pkg: 'mingw-w64-x86_64-gcc-libs' },
+];
+const missingRuntime = [];
+for (const { file } of runtimeDlls) {
+    if (!existsSync(join(msys2Path, 'mingw64', 'bin', file))) {
+        missingRuntime.push(file);
+    }
+}
+if (missingRuntime.length > 0) {
+    for (const dll of missingRuntime) fail(`Runtime DLL missing: ${dll} (critical — camera will fail to load)`);
+    const pkgs = [...new Set(runtimeDlls.filter(r => missingRuntime.includes(r.file)).map(r => r.pkg))];
+    info(`Fix: /c/msys64/usr/bin/pacman.exe -S --noconfirm --overwrite='*' ${pkgs.join(' ')}`);
+    hasErrors = true;
+}
+
 // ── 2. Junction D:\M\msys64 ──
 header('Junction D:\\M\\msys64');
 
