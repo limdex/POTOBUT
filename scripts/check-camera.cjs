@@ -3,7 +3,7 @@
 // Checks: MSYS2, junction, camera USB, WinUSB driver, auto-installs if needed
 
 const { execSync, spawnSync } = require('child_process');
-const { existsSync, writeFileSync, mkdirSync } = require('fs');
+const { existsSync, writeFileSync, mkdirSync, readdirSync } = require('fs');
 const { join } = require('path');
 const { homedir } = require('os');
 
@@ -56,6 +56,16 @@ if (existsSync(gphoto2Dll)) {
     ok('libgphoto2-6.dll found');
 } else {
     fail('libgphoto2-6.dll not found');
+    const binDir = join(msys2Path, 'mingw64', 'bin');
+    if (existsSync(binDir)) {
+        const gphotoFiles = readdirSync(binDir).filter(f => f.includes('gphoto') || f.includes('libgphoto'));
+        if (gphotoFiles.length > 0) {
+            info(`Found related: ${gphotoFiles.join(', ')}`);
+        } else {
+            info('No gphoto-related files in mingw64/bin/');
+            info('Possible DB corruption — try: pacman -S --overwrite=* mingw-w64-x86_64-gphoto2');
+        }
+    }
     info('Install: /c/msys64/usr/bin/pacman.exe -S --noconfirm mingw-w64-x86_64-gphoto2');
     hasErrors = true;
 }
@@ -65,8 +75,13 @@ header('Junction D:\\M\\msys64');
 
 const junctionTarget = 'D:\\M\\msys64';
 if (existsSync(junctionTarget)) {
-    const camlibPath = join(junctionTarget, 'mingw64', 'lib', 'libgphoto2', '2.5.34');
-    if (existsSync(camlibPath)) {
+    const camlibBase = join(junctionTarget, 'mingw64', 'lib', 'libgphoto2');
+    let camlibPath = null;
+    if (existsSync(camlibBase)) {
+        const vers = readdirSync(camlibBase).filter(d => d.startsWith('2.'));
+        if (vers.length > 0) camlibPath = join(camlibBase, vers[0]);
+    }
+    if (camlibPath && existsSync(camlibPath)) {
         ok('Junction exists, camlibs accessible');
     } else {
         warn('Junction exists but camlibs not found');
