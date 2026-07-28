@@ -457,9 +457,11 @@
 							class:selected={selectedPaper === key}
 							onclick={() => { selectedPaper = key as 'a4' | '4r'; showPaperModal = false; scheduleDraw(); }}
 						>
-							<div class="paper-preview" style="aspect-ratio: {ps.width / ps.height}">
-								<div class="paper-outline">
-									<span class="paper-label">{ps.label}</span>
+							<div class="paper-preview-wrap">
+								<div class="paper-preview" style="aspect-ratio: {ps.width / ps.height}">
+									<div class="paper-outline">
+										<span class="paper-label">{ps.label}</span>
+									</div>
 								</div>
 							</div>
 							<span class="paper-name">{ps.label}</span>
@@ -471,12 +473,15 @@
 						class:selected={selectedPaper === null}
 						onclick={() => { selectedPaper = null; showPaperModal = false; scheduleDraw(); }}
 					>
-						<div class="paper-preview" style="aspect-ratio: {template.canvas_width / template.canvas_height}">
-							<div class="paper-outline">
-								<span class="paper-label">Template</span>
+						<div class="paper-preview-wrap">
+							<div class="paper-preview" style="aspect-ratio: {template.canvas_width / template.canvas_height}">
+								<div class="paper-outline">
+									<span class="paper-label">Template</span>
+								</div>
 							</div>
 						</div>
 						<span class="paper-name">Tanpa Kertas</span>
+						<span class="paper-dims">Ukuran Asli</span>
 					</button>
 				</div>
 			</div>
@@ -694,10 +699,11 @@
 	}
 	.modal-panel {
 		background: #1f2937;
-		border-radius: 14px;
-		padding: 1.5rem;
-		max-width: 440px;
-		width: 90%;
+		border-radius: 16px;
+		padding: 1.75rem;
+		max-width: 580px;
+		width: 92%;
+		box-sizing: border-box;
 		animation: modal-in 0.2s ease-out;
 	}
 	@keyframes modal-in {
@@ -712,7 +718,7 @@
 	}
 	.modal-header h3 {
 		margin: 0;
-		font-size: 1rem;
+		font-size: 1.1rem;
 		color: #fff;
 	}
 	.modal-close {
@@ -731,18 +737,23 @@
 
 	.paper-options {
 		display: flex;
-		gap: 0.75rem;
+		gap: 1rem;
 	}
 	.paper-card {
 		flex: 1;
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: space-between;
 		border: 2px solid rgba(255,255,255,0.08);
-		border-radius: 10px;
+		border-radius: 12px;
 		background: transparent;
-		padding: 0.75rem;
+		padding: 1rem 0.75rem;
 		cursor: pointer;
 		transition: all 0.15s;
 		text-align: center;
 		color: #9ca3af;
+		box-sizing: border-box;
 	}
 	.paper-card:hover {
 		border-color: rgba(255,255,255,0.2);
@@ -752,17 +763,30 @@
 		background: rgba(79,70,229,0.1);
 		color: #fff;
 	}
-	.paper-preview {
-		border: 1.5px dashed rgba(255,255,255,0.15);
-		border-radius: 4px;
+	.paper-preview-wrap {
+		width: 100%;
+		height: 110px;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		margin-bottom: 0.5rem;
+		margin-bottom: 0.75rem;
+	}
+	.paper-preview {
+		border: 1.5px dashed rgba(255,255,255,0.15);
+		border-radius: 6px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
 		background: rgba(255,255,255,0.03);
+		max-height: 100%;
+		max-width: 100%;
+		width: auto;
+		height: 100%;
+		box-sizing: border-box;
 	}
 	.paper-outline {
 		text-align: center;
+		padding: 0.25rem;
 	}
 	.paper-label {
 		font-size: 0.75rem;
@@ -772,14 +796,14 @@
 	}
 	.paper-name {
 		display: block;
-		font-size: 0.85rem;
+		font-size: 0.9rem;
 		font-weight: 600;
 		color: inherit;
 	}
 	.paper-dims {
 		display: block;
-		font-size: 0.7rem;
+		font-size: 0.75rem;
 		color: #6b7280;
-		margin-top: 0.15rem;
+		margin-top: 0.2rem;
 	}
 </style>

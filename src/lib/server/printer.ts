@@ -89,7 +89,7 @@ $doc = New-Object System.Drawing.Printing.PrintDocument
 $doc.PrinterSettings.PrinterName = '${escapedName}'
 $doc.add_PrintPage({
     param($s, $e)
-    $area = $e.MarginBounds
+    $area = $e.PageBounds
     $scale = [Math]::Min($area.Width / $img.Width, $area.Height / $img.Height)
     $w = [Math]::Round($img.Width * $scale)
     $h = [Math]::Round($img.Height * $scale)
