@@ -10,7 +10,7 @@ echo.
 cd /d "%~dp0"
 
 echo [1/4] Mengambil pembaruan sistem dari Git (git pull)...
-git pull
+git pull origin master
 if %errorlevel% neq 0 (
     echo [!] Peringatan: Gagal melakukan git pull. Pastikan koneksi internet aktif.
 ) else (
