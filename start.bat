@@ -91,9 +91,6 @@ if defined HEAD_HASH (
 echo.
 
 if not exist "static\uploads" mkdir "static\uploads" 2>nul
-rmdir "build\client\uploads" 2>nul
-if exist "build\client\uploads" rmdir /s /q "build\client\uploads" 2>nul
-mklink /J "build\client\uploads" "%CD%\static\uploads" >nul 2>&1
 
 echo [4/4] Menjalankan aplikasi (production preview)...
 echo Aplikasi terbuka otomatis di http://localhost:4173

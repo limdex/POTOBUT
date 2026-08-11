@@ -45,3 +45,4 @@ backup/
 
 # Temp files
 *.mjpg
+/nul
