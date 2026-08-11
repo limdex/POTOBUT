@@ -25,28 +25,7 @@
 	let layerPulsingId = $state<string | null>(null);
 	let pulseTimer: ReturnType<typeof setTimeout> | undefined;
 
-	let showRulers = $state(true);
 	let activeGuides = $state<{ type: 'h' | 'v'; pos: number }[]>([]);
-
-	let rulerXTicks = $derived.by(() => {
-		if (!canvasWidth) return [];
-		const ticks: number[] = [];
-		const step = canvasWidth > 2000 ? 200 : canvasWidth > 800 ? 100 : 50;
-		for (let x = 0; x <= canvasWidth; x += step) {
-			ticks.push(x);
-		}
-		return ticks;
-	});
-
-	let rulerYTicks = $derived.by(() => {
-		if (!canvasHeight) return [];
-		const ticks: number[] = [];
-		const step = canvasHeight > 2000 ? 200 : canvasHeight > 800 ? 100 : 50;
-		for (let y = 0; y <= canvasHeight; y += step) {
-			ticks.push(y);
-		}
-		return ticks;
-	});
 
 	interface CanvasPreset {
 		id: number;
@@ -497,7 +476,7 @@
 
 			// Smart alignment snapping
 			const newGuides: { type: 'h' | 'v'; pos: number }[] = [];
-			if (showRulers) {
+			{
 				const SNAP = 6; // snap threshold in canvas px
 				const eid = ds.elementId;
 
@@ -724,15 +703,6 @@
 				<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>
 				+Overlay
 			</button>
-			<button
-				class="tool-btn"
-				class:active={showRulers}
-				onclick={() => (showRulers = !showRulers)}
-				title="Toggle Ruler & Smart Snapping"
-			>
-				<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12h20"/><path d="M6 12v-3"/><path d="M10 12v-2"/><path d="M14 12v-3"/><path d="M18 12v-2"/></svg>
-				Ruler & Snap
-			</button>
 			{#if selectedId}
 				{#if selectedId.startsWith('slot-')}
 					<button
@@ -772,29 +742,13 @@
 			{:else}
 				{@const scale = getCanvasScale()}
 				<div class="canvas-resize-wrap" style="width: {canvasWidth * scale}px; height: {canvasHeight * scale}px;">
-					{#if showRulers}
-						<div class="ruler ruler-top">
-							{#each rulerXTicks as x}
-								<div class="ruler-tick" style="left: {x * scale}px;">
-									<span class="ruler-label">{x}</span>
-								</div>
-							{/each}
-						</div>
-						<div class="ruler ruler-left">
-							{#each rulerYTicks as y}
-								<div class="ruler-tick" style="top: {y * scale}px;">
-									<span class="ruler-label">{y}</span>
-								</div>
-							{/each}
-						</div>
-					{/if}
 					<div
 						class="canvas-inner"
 						style="width: {canvasWidth}px; height: {canvasHeight}px; transform: scale({scale}); transform-origin: top left;"
 					>
 					<img src={backgroundPath} alt="BG" class="bg-img" draggable="false" style={bgCoverStyle} onpointerdown={(e) => handleBgPointerDown(e)} />
 
-					{#if showRulers && activeGuides.length > 0}
+					{#if activeGuides.length > 0}
 						{#each activeGuides as guide}
 							{#if guide.type === 'v'}
 								<div class="smart-guide vertical" style="left: {guide.pos}px;"></div>
@@ -1267,66 +1221,6 @@
 		border-color: #6366f1;
 		color: #4338ca;
 	}
-	.ruler {
-		position: absolute;
-		pointer-events: none;
-		user-select: none;
-		z-index: 5;
-	}
-	.ruler-top {
-		top: -24px;
-		left: 0;
-		right: 0;
-		height: 20px;
-		border-bottom: 1px solid #cbd5e1;
-		background: rgba(255, 255, 255, 0.9);
-		backdrop-filter: blur(4px);
-		border-radius: 4px 4px 0 0;
-	}
-	.ruler-top .ruler-tick {
-		position: absolute;
-		top: 10px;
-		bottom: 0;
-		width: 1px;
-		background: #94a3b8;
-	}
-	.ruler-top .ruler-label {
-		position: absolute;
-		top: -10px;
-		left: 2px;
-		font-size: 0.6rem;
-		font-weight: 600;
-		color: #64748b;
-		white-space: nowrap;
-	}
-	.ruler-left {
-		top: 0;
-		bottom: 0;
-		left: -24px;
-		width: 20px;
-		border-right: 1px solid #cbd5e1;
-		background: rgba(255, 255, 255, 0.9);
-		backdrop-filter: blur(4px);
-		border-radius: 4px 0 0 4px;
-	}
-	.ruler-left .ruler-tick {
-		position: absolute;
-		left: 10px;
-		right: 0;
-		height: 1px;
-		background: #94a3b8;
-	}
-	.ruler-left .ruler-label {
-		position: absolute;
-		left: -18px;
-		top: 1px;
-		font-size: 0.6rem;
-		font-weight: 600;
-		color: #64748b;
-		white-space: nowrap;
-		transform: rotate(-90deg);
-		transform-origin: right top;
-	}
 	.smart-guide {
 		position: absolute;
 		pointer-events: none;
@@ -1430,8 +1324,8 @@
 	}
 	.resize-handle {
 		position: absolute;
-		width: 24px;
-		height: 24px;
+		width: 34px;
+		height: 34px;
 		background: #4f46e5;
 		border: 2px solid #fff;
 		border-radius: 4px;
@@ -1447,33 +1341,33 @@
 		right: -12px;
 		bottom: -12px;
 	}
-	.resize-handle.nw { top: -12px; left: -12px; cursor: nw-resize; }
-	.resize-handle.ne { top: -12px; right: -12px; cursor: ne-resize; }
-	.resize-handle.sw { bottom: -12px; left: -12px; cursor: sw-resize; }
-	.resize-handle.se { bottom: -12px; right: -12px; cursor: se-resize; }
-	.resize-handle.n { top: -12px; left: 50%; margin-left: -12px; cursor: n-resize; }
-	.resize-handle.s { bottom: -12px; left: 50%; margin-left: -12px; cursor: s-resize; }
-	.resize-handle.e { right: -12px; top: 50%; margin-top: -12px; cursor: e-resize; }
-	.resize-handle.w { left: -12px; top: 50%; margin-top: -12px; cursor: w-resize; }
+	.resize-handle.nw { top: -17px; left: -17px; cursor: nw-resize; }
+	.resize-handle.ne { top: -17px; right: -17px; cursor: ne-resize; }
+	.resize-handle.sw { bottom: -17px; left: -17px; cursor: sw-resize; }
+	.resize-handle.se { bottom: -17px; right: -17px; cursor: se-resize; }
+	.resize-handle.n { top: -17px; left: 50%; margin-left: -17px; cursor: n-resize; }
+	.resize-handle.s { bottom: -17px; left: 50%; margin-left: -17px; cursor: s-resize; }
+	.resize-handle.e { right: -17px; top: 50%; margin-top: -17px; cursor: e-resize; }
+	.resize-handle.w { left: -17px; top: 50%; margin-top: -17px; cursor: w-resize; }
 
 	.canvas-resize-handle {
 		position: absolute;
-		width: 12px;
-		height: 12px;
+		width: 10px;
+		height: 10px;
 		background: #4f46e5;
 		border: 1px solid #fff;
 		border-radius: 2px;
 		z-index: 10;
 		cursor: pointer;
 	}
-	.canvas-resize-handle.nw { top: -6px; left: -6px; cursor: nw-resize; }
-	.canvas-resize-handle.ne { top: -6px; right: -6px; cursor: ne-resize; }
-	.canvas-resize-handle.sw { bottom: -6px; left: -6px; cursor: sw-resize; }
-	.canvas-resize-handle.se { bottom: -6px; right: -6px; cursor: se-resize; }
-	.canvas-resize-handle.n { top: -6px; left: 50%; margin-left: -6px; cursor: n-resize; }
-	.canvas-resize-handle.s { bottom: -6px; left: 50%; margin-left: -6px; cursor: s-resize; }
-	.canvas-resize-handle.e { right: -6px; top: 50%; margin-top: -6px; cursor: e-resize; }
-	.canvas-resize-handle.w { left: -6px; top: 50%; margin-top: -6px; cursor: w-resize; }
+	.canvas-resize-handle.nw { top: -5px; left: -5px; cursor: nw-resize; }
+	.canvas-resize-handle.ne { top: -5px; right: -5px; cursor: ne-resize; }
+	.canvas-resize-handle.sw { bottom: -5px; left: -5px; cursor: sw-resize; }
+	.canvas-resize-handle.se { bottom: -5px; right: -5px; cursor: se-resize; }
+	.canvas-resize-handle.n { top: -5px; left: 50%; margin-left: -5px; cursor: n-resize; }
+	.canvas-resize-handle.s { bottom: -5px; left: 50%; margin-left: -5px; cursor: s-resize; }
+	.canvas-resize-handle.e { right: -5px; top: 50%; margin-top: -5px; cursor: e-resize; }
+	.canvas-resize-handle.w { left: -5px; top: 50%; margin-top: -5px; cursor: w-resize; }
 	.sidebar {
 		width: 180px;
 		padding: 0.8rem;
