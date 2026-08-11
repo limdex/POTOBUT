@@ -95,6 +95,7 @@ echo Aplikasi terbuka otomatis di http://localhost:4173
 echo Tekan Ctrl+C di jendela ini untuk menghentikan aplikasi.
 echo.
 set "PORT=4173"
+set "BODY_SIZE_LIMIT=5MB"
 start "" "http://localhost:4173"
 call npm run preview
 
