@@ -87,6 +87,55 @@ Add-Type -AssemblyName System.Drawing
 $img = [System.Drawing.Image]::FromFile('${escapedPath}')
 $doc = New-Object System.Drawing.Printing.PrintDocument
 $doc.PrinterSettings.PrinterName = '${escapedName}'
+
+if ($img.Width -gt $img.Height) {
+    $doc.DefaultPageSettings.Landscape = $true
+} else {
+    $doc.DefaultPageSettings.Landscape = $false
+}
+
+$doc.DefaultPageSettings.Margins = New-Object System.Drawing.Printing.Margins(0, 0, 0, 0)
+$doc.OriginAtMargins = $false
+
+$imgW100 = [Math]::Round(($img.Width / 300.0) * 100.0)
+$imgH100 = [Math]::Round(($img.Height / 300.0) * 100.0)
+
+$targetSize = $null
+foreach ($ps in $doc.PrinterSettings.PaperSizes) {
+    $pw = $ps.Width
+    $ph = $ps.Height
+    $wDiff = [Math]::Abs($pw - $imgW100)
+    $hDiff = [Math]::Abs($ph - $imgH100)
+    $wDiffSwap = [Math]::Abs($pw - $imgH100)
+    $hDiffSwap = [Math]::Abs($ph - $imgW100)
+    if (($wDiff -le 15 -and $hDiff -le 15) -or ($wDiffSwap -le 15 -and $hDiffSwap -le 15)) {
+        $targetSize = $ps
+        break
+    }
+}
+
+if (-not $targetSize) {
+    if ($imgW100 -le 500 -or $imgH100 -le 500) {
+        foreach ($ps in $doc.PrinterSettings.PaperSizes) {
+            if ($ps.PaperName -match '4x6|4R|KG|Postcard|Photo 4|10x15|10 x 15') {
+                $targetSize = $ps
+                break
+            }
+        }
+    } else {
+        foreach ($ps in $doc.PrinterSettings.PaperSizes) {
+            if ($ps.PaperName -match 'A4') {
+                $targetSize = $ps
+                break
+            }
+        }
+    }
+}
+
+if ($targetSize) {
+    $doc.DefaultPageSettings.PaperSize = $targetSize
+}
+
 $doc.add_PrintPage({
     param($s, $e)
     $area = $e.PageBounds
