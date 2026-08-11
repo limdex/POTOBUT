@@ -1458,31 +1458,22 @@
 
 	.canvas-resize-handle {
 		position: absolute;
-		width: 24px;
-		height: 24px;
+		width: 12px;
+		height: 12px;
 		background: #4f46e5;
-		border: 2px solid #fff;
-		border-radius: 4px;
-		box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
-		z-index: 20;
+		border: 1px solid #fff;
+		border-radius: 2px;
+		z-index: 10;
 		cursor: pointer;
 	}
-	.canvas-resize-handle::before {
-		content: '';
-		position: absolute;
-		top: -12px;
-		left: -12px;
-		right: -12px;
-		bottom: -12px;
-	}
-	.canvas-resize-handle.nw { top: -12px; left: -12px; cursor: nw-resize; }
-	.canvas-resize-handle.ne { top: -12px; right: -12px; cursor: ne-resize; }
-	.canvas-resize-handle.sw { bottom: -12px; left: -12px; cursor: sw-resize; }
-	.canvas-resize-handle.se { bottom: -12px; right: -12px; cursor: se-resize; }
-	.canvas-resize-handle.n { top: -12px; left: 50%; margin-left: -12px; cursor: n-resize; }
-	.canvas-resize-handle.s { bottom: -12px; left: 50%; margin-left: -12px; cursor: s-resize; }
-	.canvas-resize-handle.e { right: -12px; top: 50%; margin-top: -12px; cursor: e-resize; }
-	.canvas-resize-handle.w { left: -12px; top: 50%; margin-top: -12px; cursor: w-resize; }
+	.canvas-resize-handle.nw { top: -6px; left: -6px; cursor: nw-resize; }
+	.canvas-resize-handle.ne { top: -6px; right: -6px; cursor: ne-resize; }
+	.canvas-resize-handle.sw { bottom: -6px; left: -6px; cursor: sw-resize; }
+	.canvas-resize-handle.se { bottom: -6px; right: -6px; cursor: se-resize; }
+	.canvas-resize-handle.n { top: -6px; left: 50%; margin-left: -6px; cursor: n-resize; }
+	.canvas-resize-handle.s { bottom: -6px; left: 50%; margin-left: -6px; cursor: s-resize; }
+	.canvas-resize-handle.e { right: -6px; top: 50%; margin-top: -6px; cursor: e-resize; }
+	.canvas-resize-handle.w { left: -6px; top: 50%; margin-top: -6px; cursor: w-resize; }
 	.sidebar {
 		width: 180px;
 		padding: 0.8rem;
