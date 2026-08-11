@@ -19,6 +19,63 @@
 	let canvasEl = $state<HTMLDivElement | undefined>(undefined);
 	let canvasScale = $state(1);
 	let confirmDelete = $state<'slots' | 'overlays' | null>(null);
+	let layerPulsingId = $state<string | null>(null);
+	let pulseTimer: ReturnType<typeof setTimeout> | undefined;
+
+	interface CanvasPreset {
+		id: string;
+		name: string;
+		width: number;
+		height: number;
+	}
+
+	let canvasPresets = $state<CanvasPreset[]>([]);
+
+	$effect(() => {
+		if (browser) {
+			const saved = localStorage.getItem('potobut_canvas_presets');
+			if (saved) {
+				try {
+					canvasPresets = JSON.parse(saved);
+				} catch {}
+			}
+		}
+	});
+
+	function saveCanvasPresets(presets: CanvasPreset[]) {
+		canvasPresets = presets;
+		if (browser) {
+			localStorage.setItem('potobut_canvas_presets', JSON.stringify(presets));
+		}
+	}
+
+	function addCanvasPreset() {
+		if (!canvasWidth || !canvasHeight) return;
+		if (canvasPresets.length >= 10) return;
+		const num = canvasPresets.length + 1;
+		const newPreset: CanvasPreset = {
+			id: 'preset-' + Date.now(),
+			name: `Default ${num}`,
+			width: canvasWidth,
+			height: canvasHeight
+		};
+		saveCanvasPresets([...canvasPresets, newPreset]);
+	}
+
+	function applyCanvasPreset(preset: CanvasPreset) {
+		canvasWidth = preset.width;
+		canvasHeight = preset.height;
+	}
+
+	function removeCanvasPreset(id: string) {
+		saveCanvasPresets(canvasPresets.filter(p => p.id !== id));
+	}
+
+	function triggerLayerPulse(id: string) {
+		layerPulsingId = id;
+		if (pulseTimer) clearTimeout(pulseTimer);
+		pulseTimer = setTimeout(() => { layerPulsingId = null; }, 400);
+	}
 
 	let nextOverlayId = $state(overlays.length + 1);
 
@@ -162,6 +219,146 @@
 		} else {
 			overlays = overlays.filter(o => o.id !== selectedId);
 			selectedId = null;
+		}
+	}
+
+	function duplicateSelectedSlot() {
+		if (!selectedId || !selectedId.startsWith('slot-')) return;
+		if (slots.length >= 8) return;
+		const idx = parseInt(selectedId.replace('slot-', '')) - 1;
+		if (idx >= 0 && idx < slots.length) {
+			const src = slots[idx];
+			const newX = Math.max(0, Math.min(src.x + 20, (canvasWidth || 800) - src.width));
+			const newY = Math.max(0, Math.min(src.y + 20, (canvasHeight || 1000) - src.height));
+			const newSlot: Slot = {
+				x: Math.round(newX),
+				y: Math.round(newY),
+				width: src.width,
+				height: src.height
+			};
+			slots = [...slots, newSlot];
+			selectedId = 'slot-' + slots.length;
+		}
+	}
+
+	function handleKeydown(e: KeyboardEvent) {
+		const tag = (e.target as HTMLElement)?.tagName;
+		if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+		if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
+			if (selectedId && selectedId.startsWith('slot-')) {
+				e.preventDefault();
+				duplicateSelectedSlot();
+			}
+		} else if ((e.ctrlKey || e.metaKey) && e.key === ']') {
+			if (selectedId) {
+				e.preventDefault();
+				if (e.shiftKey) moveLayerToFront();
+				else moveLayerUp();
+			}
+		} else if ((e.ctrlKey || e.metaKey) && e.key === '[') {
+			if (selectedId) {
+				e.preventDefault();
+				if (e.shiftKey) moveLayerToBack();
+				else moveLayerDown();
+			}
+		} else if (e.key === 'Delete' || e.key === 'Backspace') {
+			if (selectedId) {
+				e.preventDefault();
+				removeSelected();
+			}
+		}
+	}
+
+	function moveLayerUp() {
+		if (!selectedId) return;
+		if (selectedId.startsWith('slot-')) {
+			const idx = getSelectedSlotIndex();
+			if (idx < 0 || idx >= slots.length - 1) return;
+			const newSlots = [...slots];
+			const temp = newSlots[idx];
+			newSlots[idx] = newSlots[idx + 1];
+			newSlots[idx + 1] = temp;
+			slots = newSlots;
+			selectedId = 'slot-' + (idx + 2);
+			triggerLayerPulse(selectedId);
+		} else {
+			const idx = overlays.findIndex(o => o.id === selectedId);
+			if (idx < 0 || idx >= overlays.length - 1) return;
+			const newOverlays = [...overlays];
+			const temp = newOverlays[idx];
+			newOverlays[idx] = newOverlays[idx + 1];
+			newOverlays[idx + 1] = temp;
+			overlays = newOverlays;
+			triggerLayerPulse(selectedId);
+		}
+	}
+
+	function moveLayerDown() {
+		if (!selectedId) return;
+		if (selectedId.startsWith('slot-')) {
+			const idx = getSelectedSlotIndex();
+			if (idx <= 0) return;
+			const newSlots = [...slots];
+			const temp = newSlots[idx];
+			newSlots[idx] = newSlots[idx - 1];
+			newSlots[idx - 1] = temp;
+			slots = newSlots;
+			selectedId = 'slot-' + idx;
+			triggerLayerPulse(selectedId);
+		} else {
+			const idx = overlays.findIndex(o => o.id === selectedId);
+			if (idx <= 0) return;
+			const newOverlays = [...overlays];
+			const temp = newOverlays[idx];
+			newOverlays[idx] = newOverlays[idx - 1];
+			newOverlays[idx - 1] = temp;
+			overlays = newOverlays;
+			triggerLayerPulse(selectedId);
+		}
+	}
+
+	function moveLayerToFront() {
+		if (!selectedId) return;
+		if (selectedId.startsWith('slot-')) {
+			const idx = getSelectedSlotIndex();
+			if (idx < 0 || idx >= slots.length - 1) return;
+			const target = slots[idx];
+			const newSlots = slots.filter((_, i) => i !== idx);
+			newSlots.push(target);
+			slots = newSlots;
+			selectedId = 'slot-' + slots.length;
+			triggerLayerPulse(selectedId);
+		} else {
+			const idx = overlays.findIndex(o => o.id === selectedId);
+			if (idx < 0 || idx >= overlays.length - 1) return;
+			const target = overlays[idx];
+			const newOverlays = overlays.filter((_, i) => i !== idx);
+			newOverlays.push(target);
+			overlays = newOverlays;
+			triggerLayerPulse(selectedId);
+		}
+	}
+
+	function moveLayerToBack() {
+		if (!selectedId) return;
+		if (selectedId.startsWith('slot-')) {
+			const idx = getSelectedSlotIndex();
+			if (idx <= 0) return;
+			const target = slots[idx];
+			const newSlots = slots.filter((_, i) => i !== idx);
+			newSlots.unshift(target);
+			slots = newSlots;
+			selectedId = 'slot-1';
+			triggerLayerPulse(selectedId);
+		} else {
+			const idx = overlays.findIndex(o => o.id === selectedId);
+			if (idx <= 0) return;
+			const target = overlays[idx];
+			const newOverlays = overlays.filter((_, i) => i !== idx);
+			newOverlays.unshift(target);
+			overlays = newOverlays;
+			triggerLayerPulse(selectedId);
 		}
 	}
 
@@ -410,6 +607,8 @@
 	<title>Editor Template — potobut</title>
 </svelte:head>
 
+<svelte:window onkeydown={handleKeydown} />
+
 <div class="editor-page">
 	<div class="topbar">
 		<button class="back-btn" onclick={() => goto('/admin')}>← Kembali</button>
@@ -434,7 +633,18 @@
 				+Overlay
 			</button>
 			{#if selectedId}
-				<button class="tool-btn danger" onclick={removeSelected} title="Hapus">
+				{#if selectedId.startsWith('slot-')}
+					<button
+						class="tool-btn"
+						onclick={duplicateSelectedSlot}
+						disabled={slots.length >= 8}
+						title="Duplikat Slot Foto (Ctrl+D)"
+					>
+						<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+						Duplikat
+					</button>
+				{/if}
+				<button class="tool-btn danger" onclick={removeSelected} title="Hapus (Delete)">
 					<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
 					Hapus
 				</button>
@@ -468,6 +678,7 @@
 						<div
 							class="slot-el"
 							class:selected={selectedId === sid}
+							class:layer-pulsing={layerPulsingId === sid}
 							style="left: {slot.x}px; top: {slot.y}px; width: {slot.width}px; height: {slot.height}px;"
 							onpointerdown={(e) => handlePointerDown(e, 'slot', sid)}
 						>
@@ -489,15 +700,17 @@
 						</div>
 					{/each}
 
-					{#each overlays as ov}
+					{#each overlays as ov, i}
 						<div
 							class="overlay-el"
 							class:selected={selectedId === ov.id}
+							class:layer-pulsing={layerPulsingId === ov.id}
 							style="left: {ov.x}px; top: {ov.y}px; width: {ov.width}px; height: {ov.height}px; transform: rotate({ov.rotation}deg);"
 							onpointerdown={(e) => handlePointerDown(e, 'overlay', ov.id)}
 						>
 							<img src={ov.src} alt="" draggable="false" />
 							{#if selectedId === ov.id}
+								<div class="overlay-badge">Overlay {i + 1} ({i + 1}/{overlays.length})</div>
 								{#each ['nw', 'ne', 'sw', 'se', 'n', 's', 'e', 'w'] as handle}
 									<div
 										class="resize-handle {handle}"
@@ -523,8 +736,11 @@
 		<div class="sidebar">
 			{#if selectedId}
 				{@const isSlot = selectedId.startsWith('slot-')}
-				{@const idx = getSelectedSlotIndex()}
+				{@const idx = isSlot ? getSelectedSlotIndex() : overlays.findIndex(o => o.id === selectedId)}
 				{@const ov = getSelectedOverlay()}
+				{@const totalLayers = isSlot ? slots.length : overlays.length}
+				{@const isTopLayer = idx >= totalLayers - 1}
+				{@const isBottomLayer = idx <= 0}
 				<div class="sidebar-section">
 					<h3>{isSlot ? 'Slot ' + (idx + 1) : 'Overlay'}</h3>
 					{#if isSlot && idx >= 0}
@@ -533,6 +749,14 @@
 						<label>Y <input type="number" value={Math.round(s.y)} oninput={(e) => updateSlotPos(idx, 'y', parseInt((e.target as HTMLInputElement).value) || 0)} /></label>
 						<label>W <input type="number" value={Math.round(s.width)} oninput={(e) => updateSlotPos(idx, 'width', parseInt((e.target as HTMLInputElement).value) || 50)} /></label>
 						<label>H <input type="number" value={Math.round(s.height)} oninput={(e) => updateSlotPos(idx, 'height', parseInt((e.target as HTMLInputElement).value) || 50)} /></label>
+						<button
+							class="sidebar-action-btn"
+							onclick={duplicateSelectedSlot}
+							disabled={slots.length >= 8}
+						>
+							<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+							Duplikat Slot
+						</button>
 					{:else if ov}
 						<label>X <input type="number" value={Math.round(ov.x)} oninput={(e) => updateOverlay('x', parseInt((e.target as HTMLInputElement).value) || 0)} /></label>
 						<label>Y <input type="number" value={Math.round(ov.y)} oninput={(e) => updateOverlay('y', parseInt((e.target as HTMLInputElement).value) || 0)} /></label>
@@ -540,6 +764,28 @@
 						<label>H <input type="number" value={Math.round(ov.height)} oninput={(e) => updateOverlay('height', parseInt((e.target as HTMLInputElement).value) || 50)} /></label>
 						<label>Rot <input type="number" value={ov.rotation} oninput={(e) => updateOverlay('rotation', parseFloat((e.target as HTMLInputElement).value) || 0)} /></label>
 					{/if}
+
+					<div class="layer-section">
+						<div class="layer-title">Posisi Layer ({idx + 1}/{totalLayers})</div>
+						<div class="layer-grid">
+							<button class="layer-btn" onclick={moveLayerToFront} disabled={isTopLayer || totalLayers <= 1} title="Paling Depan (Ctrl+Shift+])">
+								<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m17 11-5-5-5 5"/><path d="m17 18-5-5-5 5"/></svg>
+								Paling Depan
+							</button>
+							<button class="layer-btn" onclick={moveLayerToBack} disabled={isBottomLayer || totalLayers <= 1} title="Paling Belakang (Ctrl+Shift+[)">
+								<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7 13 5 5 5-5"/><path d="m7 6 5 5 5-5"/></svg>
+								Paling Belakang
+							</button>
+							<button class="layer-btn" onclick={moveLayerUp} disabled={isTopLayer || totalLayers <= 1} title="Ke Atas (Ctrl+])">
+								<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 15-6-6-6 6"/></svg>
+								Ke Atas
+							</button>
+							<button class="layer-btn" onclick={moveLayerDown} disabled={isBottomLayer || totalLayers <= 1} title="Ke Bawah (Ctrl+[)">
+								<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+								Ke Bawah
+							</button>
+						</div>
+					</div>
 				</div>
 			{:else}
 				{#if canvasWidth > 0}
@@ -563,6 +809,40 @@
 					</div>
 				{/if}
 			{/if}
+
+			<div class="sidebar-section preset-section">
+				<h3>Default Ukuran Canvas</h3>
+				{#if canvasPresets.length > 0}
+					<div class="preset-list">
+						{#each canvasPresets as preset}
+							<div class="preset-item">
+								<button
+									class="preset-apply-btn"
+									onclick={() => applyCanvasPreset(preset)}
+									title="Gunakan {preset.name} ({preset.width}×{preset.height} px)"
+								>
+									<span class="preset-title">{preset.name}</span>
+									<span class="preset-dim">{preset.width}×{preset.height}</span>
+								</button>
+								<button
+									class="preset-del-btn"
+									onclick={() => removeCanvasPreset(preset.id)}
+									title="Hapus default"
+								>
+									×
+								</button>
+							</div>
+						{/each}
+					</div>
+				{/if}
+				<button
+					class="add-preset-btn"
+					onclick={addCanvasPreset}
+					disabled={canvasPresets.length >= 10 || !canvasWidth || !canvasHeight}
+				>
+					+ Tambah Default Canvas ({canvasPresets.length}/10)
+				</button>
+			</div>
 
 			{#if confirmDelete}
 				<div class="confirm-pop">
@@ -651,10 +931,188 @@
 	}
 	.tool-btn:hover { background: #f3f4f6; border-color: #d1d5db; }
 	.tool-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-	.tool-btn.danger:hover { background: #fee2e2; border-color: #fca5a5; color: #dc2626; }
-	.canvas-resize-wrap {
-		position: relative;
-		display: inline-block;
+	.tool-btn.danger:hover {
+		background: #fef2f2;
+		border-color: #fca5a5;
+		color: #dc2626;
+	}
+	.sidebar-action-btn {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.4rem;
+		width: 100%;
+		margin-top: 0.5rem;
+		padding: 0.45rem 0.75rem;
+		border: 1px solid #d1d5db;
+		border-radius: 6px;
+		background: #fff;
+		font-size: 0.85rem;
+		font-weight: 500;
+		color: #374151;
+		cursor: pointer;
+		transition: background 0.1s;
+	}
+	.sidebar-action-btn:hover:not(:disabled) {
+		background: #f3f4f6;
+		border-color: #9ca3af;
+	}
+	.sidebar-action-btn:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+	.layer-section {
+		margin-top: 1rem;
+		padding-top: 0.75rem;
+		border-top: 1px solid #e5e7eb;
+	}
+	.layer-title {
+		font-size: 0.8rem;
+		font-weight: 600;
+		color: #6b7280;
+		margin-bottom: 0.5rem;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+	}
+	.layer-grid {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 0.4rem;
+	}
+	.layer-btn {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.3rem;
+		padding: 0.4rem 0.5rem;
+		border: 1px solid #d1d5db;
+		border-radius: 6px;
+		background: #fff;
+		font-size: 0.75rem;
+		font-weight: 500;
+		color: #374151;
+		cursor: pointer;
+		transition: all 0.1s;
+	}
+	.layer-btn:hover:not(:disabled) {
+		background: #f3f4f6;
+		border-color: #9ca3af;
+		color: #111827;
+	}
+	.layer-btn:disabled {
+		opacity: 0.4;
+		cursor: not-allowed;
+		background: #f9fafb;
+		border-color: #e5e7eb;
+		color: #9ca3af;
+	}
+	.overlay-badge {
+		position: absolute;
+		top: -24px;
+		left: 50%;
+		transform: translateX(-50%);
+		background: #4f46e5;
+		color: #fff;
+		font-size: 0.65rem;
+		font-weight: 600;
+		padding: 0.15rem 0.45rem;
+		border-radius: 4px;
+		white-space: nowrap;
+		pointer-events: none;
+		box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+		z-index: 10;
+	}
+	.layer-pulsing {
+		animation: layerGlowPulse 0.4s cubic-bezier(0, 0, 0.2, 1);
+	}
+	@keyframes layerGlowPulse {
+		0% { outline: 3px solid #6366f1; outline-offset: 2px; box-shadow: 0 0 12px rgba(99, 102, 241, 0.8); }
+		50% { outline: 4px solid #818cf8; outline-offset: 4px; box-shadow: 0 0 20px rgba(99, 102, 241, 0.9); }
+		100% { outline: 2px solid #4f46e5; outline-offset: 0px; box-shadow: none; }
+	}
+	.preset-section {
+		margin-top: 1.25rem;
+		padding-top: 0.75rem;
+		border-top: 1px solid #e5e7eb;
+	}
+	.preset-list {
+		display: flex;
+		flex-direction: column;
+		gap: 0.35rem;
+		margin-bottom: 0.6rem;
+	}
+	.preset-item {
+		display: flex;
+		align-items: center;
+		border: 1px solid #e5e7eb;
+		border-radius: 6px;
+		background: #fff;
+		overflow: hidden;
+		transition: border-color 0.1s;
+	}
+	.preset-item:hover {
+		border-color: #cbd5e1;
+	}
+	.preset-apply-btn {
+		flex: 1;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		padding: 0.4rem 0.6rem;
+		border: none;
+		background: transparent;
+		font-size: 0.8rem;
+		cursor: pointer;
+		text-align: left;
+	}
+	.preset-apply-btn:hover {
+		background: #f8fafc;
+	}
+	.preset-title {
+		font-weight: 600;
+		color: #334155;
+	}
+	.preset-dim {
+		font-size: 0.75rem;
+		color: #64748b;
+	}
+	.preset-del-btn {
+		padding: 0.4rem 0.55rem;
+		border: none;
+		background: transparent;
+		color: #94a3b8;
+		font-size: 1.1rem;
+		line-height: 1;
+		cursor: pointer;
+	}
+	.preset-del-btn:hover {
+		color: #ef4444;
+		background: #fef2f2;
+	}
+	.add-preset-btn {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.4rem;
+		width: 100%;
+		padding: 0.5rem;
+		border: 1px dashed #cbd5e1;
+		border-radius: 6px;
+		background: #f8fafc;
+		font-size: 0.8rem;
+		font-weight: 600;
+		color: #4f46e5;
+		cursor: pointer;
+		transition: all 0.1s;
+	}
+	.add-preset-btn:hover:not(:disabled) {
+		border-color: #6366f1;
+		background: #eef2ff;
+	}
+	.add-preset-btn:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+		border-style: solid;
 	}
 	.canvas-container {
 		flex: 1;

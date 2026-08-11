@@ -122,3 +122,4 @@ Status shown as Terhubung/Terputus.
 ## Workflow Rules
 
 - **Git Push**: Jangan langsung `git push` otomatis tanpa konfirmasi pengguna. Dokumentasikan rencana/rangkuman perubahan di file Markdown (.md) atau artifact terlebih dahulu, dan tunggu konfirmasi pengguna sebelum melakukan push.
+- **Verifikasi**: Cukup gunakan `npm run check` (typecheck) untuk verifikasi kode. Tidak perlu menjalankan `npm run build` otomatis setiap kali perubahan dilakukan kecuali diminta eksplisit oleh pengguna.
