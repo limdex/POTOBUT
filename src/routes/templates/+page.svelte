@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { shootState } from '$lib/stores/shoot.svelte';
+	import TemplatePreview from '$lib/components/TemplatePreview.svelte';
 
 	import type { TemplateRecord } from '$lib/data/admin-types';
 
@@ -35,7 +36,7 @@
 					onclick={() => select(template.id)}
 				>
 					<div class="preview">
-						<img src={template.background_path} alt={template.name} />
+						<TemplatePreview {template} />
 						<div class="slots-badge">{template.slot_count} Foto</div>
 					</div>
 					<div class="info">
@@ -110,14 +111,6 @@
 		border-radius: 10px;
 		overflow: hidden;
 		background: #f3f4f6;
-	}
-	.preview img {
-		display: block;
-		width: 100%;
-		height: auto;
-		aspect-ratio: 3 / 4;
-		object-fit: cover;
-		max-height: 70vh;
 	}
 	.slots-badge {
 		position: absolute;

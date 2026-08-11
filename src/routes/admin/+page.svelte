@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
 	import type { TemplateRecord } from '$lib/data/admin-types';
+	import TemplatePreview from '$lib/components/TemplatePreview.svelte';
 
 	let { data }: { data: { templates: TemplateRecord[] } } = $props();
 	let templates = $state<TemplateRecord[]>([]);
@@ -109,11 +110,7 @@
 			{#each templates as tpl (tpl.id)}
 				<div class="card" role="button" tabindex="0" onclick={() => goto(`/admin/editor?id=${tpl.id}`)} onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') goto(`/admin/editor?id=${tpl.id}`); }}>
 					<div class="card-preview">
-						{#if tpl.background_path}
-							<img src={tpl.background_path} alt={tpl.name} />
-						{:else}
-							<div class="no-bg">No BG</div>
-						{/if}
+						<TemplatePreview template={tpl} />
 					</div>
 					<div class="card-info">
 						<h3>{tpl.name}</h3>
@@ -304,19 +301,6 @@
 		aspect-ratio: 2 / 3;
 		background: #f3f4f6;
 		overflow: hidden;
-	}
-	.card-preview img {
-		width: 100%;
-		height: 100%;
-		object-fit: cover;
-	}
-	.no-bg {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		height: 100%;
-		color: #9ca3af;
-		font-size: 0.85rem;
 	}
 	.card-info {
 		padding: 0.7rem;

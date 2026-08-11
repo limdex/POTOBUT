@@ -87,7 +87,7 @@
 		pulseTimer = setTimeout(() => { layerPulsingId = null; }, 400);
 	}
 
-	let nextOverlayId = $state(overlays.length + 1);
+	let nextOverlayId = $state(untrack(() => overlays.length + 1));
 
 	let bgNaturalWidth = $state(0);
 	let bgNaturalHeight = $state(0);
@@ -722,6 +722,8 @@
 			{/if}
 		</div>
 
+		<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+		<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
 		<div
 			class="canvas-container"
 			role="application"
