@@ -23,7 +23,7 @@
 	let pulseTimer: ReturnType<typeof setTimeout> | undefined;
 
 	interface CanvasPreset {
-		id: string;
+		id: number;
 		name: string;
 		width: number;
 		height: number;
@@ -33,33 +33,33 @@
 
 	$effect(() => {
 		if (browser) {
-			const saved = localStorage.getItem('potobut_canvas_presets');
-			if (saved) {
-				try {
-					canvasPresets = JSON.parse(saved);
-				} catch {}
-			}
+			fetchPresets();
 		}
 	});
 
-	function saveCanvasPresets(presets: CanvasPreset[]) {
-		canvasPresets = presets;
-		if (browser) {
-			localStorage.setItem('potobut_canvas_presets', JSON.stringify(presets));
-		}
+	async function fetchPresets() {
+		try {
+			const res = await fetch('/api/presets');
+			if (res.ok) {
+				canvasPresets = await res.json();
+			}
+		} catch {}
 	}
 
-	function addCanvasPreset() {
+	async function addCanvasPreset() {
 		if (!canvasWidth || !canvasHeight) return;
 		if (canvasPresets.length >= 10) return;
-		const num = canvasPresets.length + 1;
-		const newPreset: CanvasPreset = {
-			id: 'preset-' + Date.now(),
-			name: `Default ${num}`,
-			width: canvasWidth,
-			height: canvasHeight
-		};
-		saveCanvasPresets([...canvasPresets, newPreset]);
+		try {
+			const res = await fetch('/api/presets', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ width: canvasWidth, height: canvasHeight })
+			});
+			if (res.ok) {
+				const created = await res.json();
+				canvasPresets = [...canvasPresets, created];
+			}
+		} catch {}
 	}
 
 	function applyCanvasPreset(preset: CanvasPreset) {
@@ -67,8 +67,13 @@
 		canvasHeight = preset.height;
 	}
 
-	function removeCanvasPreset(id: string) {
-		saveCanvasPresets(canvasPresets.filter(p => p.id !== id));
+	async function removeCanvasPreset(id: number) {
+		try {
+			const res = await fetch(`/api/presets/${id}`, { method: 'DELETE' });
+			if (res.ok) {
+				canvasPresets = canvasPresets.filter(p => p.id !== id);
+			}
+		} catch {}
 	}
 
 	function triggerLayerPulse(id: string) {
@@ -790,9 +795,9 @@
 			{:else}
 				{#if canvasWidth > 0}
 					<div class="sidebar-section">
-						<h3>Canvas</h3>
-						<label>W <input type="number" bind:value={canvasWidth} min="1" /></label>
-						<label>H <input type="number" bind:value={canvasHeight} min="1" /></label>
+						<h3>Canvas (px)</h3>
+						<label>W (px) <input type="number" bind:value={canvasWidth} min="1" /></label>
+						<label>H (px) <input type="number" bind:value={canvasHeight} min="1" /></label>
 					</div>
 				{/if}
 				<div class="sidebar-empty">Klik slot atau overlay untuk mengatur posisi</div>
@@ -1113,6 +1118,10 @@
 		opacity: 0.5;
 		cursor: not-allowed;
 		border-style: solid;
+	}
+	.canvas-resize-wrap {
+		position: relative;
+		display: inline-block;
 	}
 	.canvas-container {
 		flex: 1;

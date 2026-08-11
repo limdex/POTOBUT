@@ -49,6 +49,47 @@ function initSchema() {
 	try {
 		db.exec('ALTER TABLE templates ADD COLUMN bg_offset_y INTEGER NOT NULL DEFAULT 0');
 	} catch {}
+
+	db.exec(`
+		CREATE TABLE IF NOT EXISTS canvas_presets (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			name TEXT NOT NULL,
+			width INTEGER NOT NULL,
+			height INTEGER NOT NULL,
+			created_at TEXT NOT NULL DEFAULT (datetime('now'))
+		)
+	`);
+}
+
+export interface CanvasPresetRecord {
+	id: number;
+	name: string;
+	width: number;
+	height: number;
+	created_at: string;
+}
+
+export function getAllCanvasPresets(): CanvasPresetRecord[] {
+	const db = getDb();
+	return db.prepare('SELECT * FROM canvas_presets ORDER BY id ASC').all() as CanvasPresetRecord[];
+}
+
+export function addCanvasPresetDb(width: number, height: number): CanvasPresetRecord | null {
+	const db = getDb();
+	const countRow = db.prepare('SELECT COUNT(*) as count FROM canvas_presets').get() as { count: number };
+	if (countRow.count >= 10) return null;
+
+	const nextNum = countRow.count + 1;
+	const name = `Default ${nextNum}`;
+
+	const info = db.prepare('INSERT INTO canvas_presets (name, width, height) VALUES (?, ?, ?)').run(name, width, height);
+	return db.prepare('SELECT * FROM canvas_presets WHERE id = ?').get(info.lastInsertRowid) as CanvasPresetRecord;
+}
+
+export function deleteCanvasPresetDb(id: number): boolean {
+	const db = getDb();
+	const info = db.prepare('DELETE FROM canvas_presets WHERE id = ?').run(id);
+	return info.changes > 0;
 }
 
 export function getParsedTemplate(id: number) {
