@@ -827,7 +827,7 @@
 									title="Gunakan {preset.name} ({preset.width}×{preset.height} px)"
 								>
 									<span class="preset-title">{preset.name}</span>
-									<span class="preset-dim">{preset.width}×{preset.height}</span>
+									<span class="preset-dim">{preset.width} × {preset.height} px</span>
 								</button>
 								<button
 									class="preset-del-btn"
@@ -1061,8 +1061,9 @@
 	.preset-apply-btn {
 		flex: 1;
 		display: flex;
-		align-items: center;
-		justify-content: space-between;
+		flex-direction: column;
+		align-items: flex-start;
+		gap: 0.1rem;
 		padding: 0.4rem 0.6rem;
 		border: none;
 		background: transparent;
@@ -1078,8 +1079,8 @@
 		color: #334155;
 	}
 	.preset-dim {
-		font-size: 0.75rem;
-		color: #64748b;
+		font-size: 0.7rem;
+		color: #94a3b8;
 	}
 	.preset-del-btn {
 		padding: 0.4rem 0.55rem;
