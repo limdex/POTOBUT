@@ -17,7 +17,8 @@ export default defineConfig({
 			adapter: adapter(),
 			csrf: {
 				checkOrigin: false
-			}
+			},
+			bodySizeLimit: 5 * 1024 * 1024
 		})
 	]
 });
