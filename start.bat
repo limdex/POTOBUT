@@ -52,18 +52,41 @@ node scripts/check-printer.cjs
 echo.
 
 echo [3/4] Memeriksa build aplikasi...
-if not exist "build" (
-    echo     [!] Build belum ada, membangun ^(npm run build^)...
-    call npm run build
-    if errorlevel 1 (
-        echo     [x] Gagal membangun aplikasi.
-        echo.
-        pause
-        exit /b 1
+set "HEAD_HASH="
+for /f "delims=" %%h in ('git rev-parse HEAD 2^>nul') do set "HEAD_HASH=%%h"
+set "BUILD_HASH="
+if exist "build\.build-hash" for /f "delims=" %%h in (build\.build-hash) do set "BUILD_HASH=%%h"
+
+if defined HEAD_HASH (
+    if not "%HEAD_HASH%"=="%BUILD_HASH%" (
+        echo     [!] Kode berubah sejak build terakhir, membangun ulang...
+        call npm run build
+        if errorlevel 1 (
+            echo     [x] Gagal membangun aplikasi.
+            echo.
+            pause
+            exit /b 1
+        )
+        > "build\.build-hash" echo(%HEAD_HASH%
+        echo     [v] Build berhasil
+    ) else (
+        echo     [v] Build sudah terbaru
     )
-    echo     [v] Build berhasil
 ) else (
-    echo     [v] Build sudah ada
+    if not exist "build" (
+        echo     [!] Build belum ada, membangun ulang...
+        call npm run build
+        if errorlevel 1 (
+            echo     [x] Gagal membangun aplikasi.
+            echo.
+            pause
+            exit /b 1
+        )
+        > "build\.build-hash" echo(%HEAD_HASH%
+        echo     [v] Build berhasil
+    ) else (
+        echo     [v] Build sudah ada
+    )
 )
 echo.
 
