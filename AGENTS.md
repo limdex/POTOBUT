@@ -118,3 +118,7 @@ Status shown as Terhubung/Terputus.
 - Printer integration TBD — detection via wmic/lpstat scaffolded
 - `slotPositions` are estimated; may need adjustment per template image
 - Old template model (`src/lib/data/templates.ts`) is kept for backward compat with existing routes
+
+## Workflow Rules
+
+- **Git Push**: Jangan langsung `git push` otomatis tanpa konfirmasi pengguna. Dokumentasikan rencana/rangkuman perubahan di file Markdown (.md) atau artifact terlebih dahulu, dan tunggu konfirmasi pengguna sebelum melakukan push.
