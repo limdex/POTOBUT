@@ -120,6 +120,7 @@ echo.
 :: == 6. Kamera + driver USB (WinUSB) ==
 echo [6/6] Kamera ^& driver USB (WinUSB)...
 echo     [i] Pastikan kamera sudah ON dan terkoneksi USB
+echo     [i] Kalau gagal otomatis, Zadig akan didownload & dibuka
 node scripts/check-camera.cjs
 echo.
 

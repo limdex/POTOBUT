@@ -193,38 +193,95 @@ if (!pnpOutput || pnpOutput.trim() === '') {
                 
                 // ── 5. Auto-install WinUSB ──
                 header('Auto-install WinUSB Driver');
-                
+
                 if (vid && pid) {
                     const infPath = join(process.cwd(), 'native', 'winusb-canon.inf');
-                    
+                    const nativeDir = join(process.cwd(), 'native');
+                    const runOpts = { timeout: 30000, encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] };
+
                     // Generate INF for this specific device
                     const infContent = generateWinUsbInf(vid, pid, dev.name);
-                    mkdirSync(join(process.cwd(), 'native'), { recursive: true });
+                    mkdirSync(nativeDir, { recursive: true });
                     writeFileSync(infPath, infContent);
                     info(`Generated INF: ${infPath}`);
-                    
-                    // Try pnputil
-                    info('Trying pnputil (requires admin)...');
-                    const pnputilResult = spawnSync('pnputil', [
-                        '/add-driver', infPath, '/install'
-                    ], {
-                        timeout: 30000,
-                        encoding: 'utf8',
-                        windowsHide: true,
-                        stdio: ['ignore', 'pipe', 'pipe']
-                    });
-                    
-                    const pnpOut = pnputilResult.stdout?.trim() || '';
-                    const pnpErr = pnputilResult.stderr?.trim() || '';
-                    
-                    if (pnputilResult.status === 0 && pnpOut.includes('Published')) {
-                        ok('WinUSB driver installed via pnputil');
-                        info('Camera may need reconnect after driver change');
-                    } else {
-                        fail('pnputil failed (need admin privileges)');
-                        info(`Run as admin: pnputil /add-driver "${infPath}" /install`);
-                        info('Or use Zadig: Options > List All Devices > select Canon > WinUSB > Replace Driver');
+
+                    const hwId = `USB\\VID_${vid.toUpperCase()}&PID_${pid.toUpperCase()}`;
+
+                    const methods = [
+                        {
+                            name: 'pnputil /add-driver /install',
+                            run: () => spawnSync('pnputil', ['/add-driver', infPath, '/install'], runOpts)
+                        },
+                        {
+                            name: 'pnputil /install-device',
+                            run: () => spawnSync('pnputil', ['/install-device', hwId], runOpts)
+                        },
+                        {
+                            name: 'PowerShell Update-Driver',
+                            run: () => spawnSync('powershell.exe', ['-NoProfile', '-Command',
+                                `Get-PnpDevice -InstanceId '${dev.instanceId}' | Update-Driver -DriverPath '${nativeDir}' 2>$null | Out-Null`],
+                                runOpts)
+                        }
+                    ];
+
+                    let installed = false;
+                    for (const m of methods) {
+                        if (installed) break;
+                        info(`Trying: ${m.name}...`);
+                        const res = m.run();
+                        const out = (res.stdout || '').trim();
+                        const err = (res.stderr || '').trim();
+                        const lookedOk = res.status === 0 && !/fail|error/i.test(out + ' ' + err);
+
+                        if (lookedOk) {
+                            const drv = waitForDriverService(dev.instanceId);
+                            if (drv) {
+                                ok(`WinUSB active (${drv}) via ${m.name}`);
+                                installed = true;
+                            } else {
+                                warn(`${m.name} ok, tapi driver belum aktif: "${driverService}"`);
+                                info('Kamera harus di-reconnect (cabut & colok USB), lalu jalankan ulang');
+                                installed = true;
+                            }
+                        } else {
+                            fail(`${m.name} gagal (status ${res.status})`);
+                            if (out) info(`  stdout: ${out.split('\n').slice(0, 3).join(' | ')}`);
+                            if (err) info(`  stderr: ${err.split('\n').slice(0, 3).join(' | ')}`);
+                        }
+                    }
+
+                    if (!installed) {
+                        fail('Semua metode otomatis gagal');
+                        info(`Manual: pnputil /add-driver "${infPath}" /install (jalankan sebagai admin)`);
+                        info('Atau pakai Zadig (di bawah) untuk install WinUSB');
+
+                        // ── Zadig fallback ──
+                        const zadigDir = join(nativeDir, 'zadig');
+                        const zadigPath = join(zadigDir, 'zadig.exe');
+                        if (!existsSync(zadigPath)) {
+                            info('Downloading Zadig 2.9 (fallback tool)...');
+                            mkdirSync(zadigDir, { recursive: true });
+                            const dl = spawnSync('curl', ['-L', '--fail', '-sS', '-o', zadigPath,
+                                'https://github.com/pbatard/libwdi/releases/download/v1.5.1/zadig-2.9.exe'],
+                                { timeout: 120000, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+                            if (existsSync(zadigPath) && dl.status === 0) {
+                                ok(`Zadig downloaded: ${zadigPath}`);
+                            } else {
+                                fail('Zadig download gagal — unduh manual dari https://zadig.akeo.ie/');
+                            }
+                        } else {
+                            ok(`Zadig sudah ada: ${zadigPath}`);
+                        }
+
+                        if (existsSync(zadigPath)) {
+                            info('Membuka Zadig...');
+                            info('Di Zadig: Options > List All Devices > pilih Canon > WinUSB > Replace Driver');
+                            spawnSync('cmd', ['/c', 'start', '', zadigPath], { windowsHide: true });
+                        }
+
                         hasErrors = true;
+                    } else {
+                        info('Camera may need reconnect after driver change');
                     }
                 } else {
                     fail('Cannot extract VID/PID from device');
@@ -263,16 +320,15 @@ function generateWinUsbInf(vid, pid, deviceName) {
     const vidUpper = vid.toUpperCase();
     const pidUpper = pid.toUpperCase();
     const guid = generateGuid(vidUpper, pidUpper);
-    
+
     return `; WinUSB driver for ${deviceName}
 ; Auto-generated by potobut check-camera script
 [Version]
 Signature   = "$Windows NT$"
 Class       = USBDevice
-ClassGuid   = {88BAE3C6-5F7D-4c3b-9D5C-1E7E5C7B7B7B}
+ClassGuid   = {88BAE032-5A81-49f0-BC3D-A4FF138216D6}
 Provider    = "potobut"
 DriverVer   = 01/01/2025,1.0.0.0
-CatalogFile = winusb-canon.cat
 
 [Manufacturer]
 "potobut" = potobut, NTamd64.10
@@ -283,28 +339,36 @@ CatalogFile = winusb-canon.cat
 [USB_Install]
 Include = winusb.inf
 Needs   = WINUSB.NT
-KmdfVersion = 1.11
+
+[USB_Install.Services]
+Include = winusb.inf
+Needs   = WINUSB.NT.Services
 
 [USB_Install.HW]
 AddReg = WinUSB_AddReg
 
 [WinUSB_AddReg]
-HKR,,DeviceInterfaceGUID,0x10000,"${guid}"
-
-[USB_Install.Services]
-Include    = winusb.inf
-AddService = WinUSB,0x00000002,WinUSB_ServiceInstall
-
-[WinUSB_ServiceInstall]
-DisplayName    = "WinUSB"
-ServiceType    = 1
-StartType      = 3
-ErrorControl   = 1
-ServiceBinary  = %12%\\WinUSB.sys
+HKR,,DeviceInterfaceGUIDs,0x10000,"${guid}"
 
 [Strings]
 ; Empty
 `;
+}
+
+function waitForDriverService(instanceId, tries = 3, delayMs = 2000) {
+    for (let i = 0; i < tries; i++) {
+        const drv = powershell(
+            `Get-PnpDeviceProperty -InstanceId '${instanceId}' -KeyName 'DEVPKEY_Device_Service' 2>$null | Select-Object -ExpandProperty Data`
+        );
+        if (drv === 'WinUSB' || drv === 'libusbK') return drv;
+        if (i < tries - 1) {
+            try {
+                execSync(`powershell -NoProfile -Command "Start-Sleep -Milliseconds ${delayMs}"`,
+                    { timeout: 10000, windowsHide: true });
+            } catch { /* ignore */ }
+        }
+    }
+    return null;
 }
 
 function generateGuid(vid, pid) {
