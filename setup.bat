@@ -28,7 +28,7 @@ echo [1/6] Node.js...
 where node >nul 2>&1
 if errorlevel 1 (
     echo     [!] Belum ada, menginstall via winget...
-    winget install --id OpenJS.NodeJS.22 -e --silent --accept-package-agreements --accept-source-agreements
+    winget install --id OpenJS.NodeJS.LTS -e --silent --accept-package-agreements --accept-source-agreements
     if errorlevel 1 (
         echo     [x] Gagal install Node.js
         set "FAIL=1"
@@ -36,8 +36,6 @@ if errorlevel 1 (
 ) else (
     for /f "delims=" %%v in ('node -v 2^>nul') do set "NODE_VER=%%v"
     echo     [v] Sudah terinstall: !NODE_VER!
-    set "NODE_MAJOR=!NODE_VER:~1,2!"
-    if not "!NODE_MAJOR!"=="22" echo     [!] Node v22 direkomendasikan untuk kompatibilitas
 )
 set "PATH=%ProgramFiles%\nodejs;%LocalAppData%\Programs\nodejs;%PATH%"
 echo.
