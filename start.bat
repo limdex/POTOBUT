@@ -18,7 +18,7 @@ if errorlevel 1 (
 )
 
 if not exist "node_modules" (
-    echo [!] node_modules belum ada, update dulu (git pull + npm install)...
+    echo [!] node_modules belum ada, update dulu ^(git pull + npm install^)...
     git pull origin master
     call npm install
     if errorlevel 1 (
@@ -53,7 +53,7 @@ echo.
 
 echo [3/4] Memeriksa build aplikasi...
 if not exist "build" (
-    echo     [!] Build belum ada, membangun (npm run build)...
+    echo     [!] Build belum ada, membangun ^(npm run build^)...
     call npm run build
     if errorlevel 1 (
         echo     [x] Gagal membangun aplikasi.
@@ -74,3 +74,8 @@ echo.
 set "PORT=4173"
 start "" "http://localhost:4173"
 call npm run preview
+
+echo.
+echo [x] Aplikasi berhenti. Tekan tombol untuk menutup.
+echo.
+pause
