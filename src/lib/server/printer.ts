@@ -59,8 +59,9 @@ export async function connectPrinter(name?: string): Promise<PrinterInfo> {
 			_printer.name = undefined;
 			_printer.error = 'No printer found';
 		}
-	} catch (e: any) {
-		_printer = { connected: false, available: [], error: e.message };
+	} catch (e: unknown) {
+		const msg = e instanceof Error ? e.message : String(e);
+		_printer = { connected: false, available: [], error: msg };
 	}
 	return getPrinterStatus();
 }
@@ -156,8 +157,8 @@ $img.Dispose()
 		}
 
 		return { ok: true };
-	} catch (e: any) {
-		const msg = e?.message || String(e);
+	} catch (e: unknown) {
+		const msg = e instanceof Error ? e.message : String(e);
 		return { ok: false, error: msg };
 	} finally {
 		try { unlinkSync(tempPath); } catch { /* ignore */ }

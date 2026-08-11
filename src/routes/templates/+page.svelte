@@ -2,7 +2,9 @@
 	import { goto } from '$app/navigation';
 	import { shootState } from '$lib/stores/shoot.svelte';
 
-	let { data }: { data: { templates: any[] } } = $props();
+	import type { TemplateRecord } from '$lib/data/admin-types';
+
+	let { data }: { data: { templates: TemplateRecord[] } } = $props();
 	let selectedId = $state<number | null>(null);
 
 	function select(id: number) {

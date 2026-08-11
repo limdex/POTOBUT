@@ -1,9 +1,13 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { onMount } from 'svelte';
+	import type { TemplateRecord } from '$lib/data/admin-types';
 
-	let { data }: { data: { templates: any[] } } = $props();
-	let templates = $state(data.templates || []);
+	let { data }: { data: { templates: TemplateRecord[] } } = $props();
+	let templates = $state<TemplateRecord[]>([]);
+	$effect(() => {
+		templates = data.templates || [];
+	});
 
 	let showSettings = $state(false);
 	let cameraStatus = $state<{ connected: boolean; model?: string; error?: string }>({ connected: false });
@@ -14,7 +18,7 @@
 	async function hapus(id: number) {
 		if (!confirm('Hapus template ini?')) return;
 		await fetch(`/api/templates/${id}`, { method: 'DELETE' });
-		templates = templates.filter((t: any) => t.id !== id);
+		templates = templates.filter((t: TemplateRecord) => t.id !== id);
 	}
 
 	async function fetchCameraStatus() {
@@ -88,7 +92,7 @@
 			<p>Bikin dulu cok!</p>
 			<button class="btn" onclick={() => goto('/admin/editor')}>Buat Template</button>
 			<button class="btn-outline" onclick={() => goto('/templates')}>Buka Aplikasi</button>
-			<button class="gear-btn empty-gear" onclick={() => showSettings = true}>
+			<button class="gear-btn empty-gear" onclick={() => showSettings = true} aria-label="Pengaturan Hardware">
 				<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
 			</button>
 		</div>
@@ -97,13 +101,13 @@
 			<h1>Template</h1>
 			<button class="btn" onclick={() => goto('/admin/editor')}>+ Baru</button>
 			<button class="btn-outline" onclick={() => goto('/templates')}>Buka Aplikasi</button>
-			<button class="gear-btn" onclick={() => showSettings = true}>
+			<button class="gear-btn" onclick={() => showSettings = true} aria-label="Pengaturan Hardware">
 				<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
 			</button>
 		</div>
 		<div class="grid">
 			{#each templates as tpl (tpl.id)}
-				<div class="card" onclick={() => goto(`/admin/editor?id=${tpl.id}`)}>
+				<div class="card" role="button" tabindex="0" onclick={() => goto(`/admin/editor?id=${tpl.id}`)} onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') goto(`/admin/editor?id=${tpl.id}`); }}>
 					<div class="card-preview">
 						{#if tpl.background_path}
 							<img src={tpl.background_path} alt={tpl.name} />
@@ -123,11 +127,11 @@
 </div>
 
 {#if showSettings}
-	<div class="settings-overlay" onclick={() => showSettings = false}>
-		<div class="settings-panel" onclick={(e) => e.stopPropagation()}>
+	<div class="settings-overlay" role="presentation" onclick={() => showSettings = false}>
+		<div class="settings-panel" role="dialog" aria-modal="true" tabindex="-1" onclick={(e) => e.stopPropagation()} onkeydown={() => {}}>
 			<div class="settings-header">
 				<h2>Pengaturan Hardware</h2>
-				<button class="close-btn" onclick={() => showSettings = false}>
+				<button class="close-btn" onclick={() => showSettings = false} aria-label="Tutup Pengaturan">
 					<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
 				</button>
 			</div>

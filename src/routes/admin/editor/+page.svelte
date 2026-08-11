@@ -1,18 +1,21 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { browser } from '$app/environment';
+	import { untrack } from 'svelte';
 	import { SLOT_WIDTH, SLOT_HEIGHT } from '$lib/data/admin-types';
 
-	import type { Slot, Overlay } from '$lib/data/admin-types';
-	let { data }: { data: { template: any | null } } = $props();
+	import type { Slot, Overlay, TemplateRecord } from '$lib/data/admin-types';
+	let { data }: { data: { template: TemplateRecord | null } } = $props();
 
-	let id = $state(data.template?.id ?? 0);
-	let name = $state(data.template?.name ?? '');
-	let backgroundPath = $state(data.template?.background_path ?? '');
-	let canvasWidth = $state(data.template?.canvas_width ?? 0);
-	let canvasHeight = $state(data.template?.canvas_height ?? 0);
-	let slots = $state<Slot[]>(data.template?.slots ?? []);
-	let overlays = $state<Overlay[]>(data.template?.overlays ?? []);
+	const initialTemplate = untrack(() => data.template);
+
+	let id = $state(initialTemplate?.id ?? 0);
+	let name = $state(initialTemplate?.name ?? '');
+	let backgroundPath = $state(initialTemplate?.background_path ?? '');
+	let canvasWidth = $state(initialTemplate?.canvas_width ?? 0);
+	let canvasHeight = $state(initialTemplate?.canvas_height ?? 0);
+	let slots = $state<Slot[]>(initialTemplate?.slots ?? []);
+	let overlays = $state<Overlay[]>(initialTemplate?.overlays ?? []);
 	let selectedId = $state<string | null>(null);
 	let saving = $state(false);
 	let dragState: { type: 'move' | 'resize' | 'canvas-resize' | 'bg-move'; elementId?: string; startX: number; startY: number; origX: number; origY: number; origW: number; origH: number; handle?: string } | null = null;
@@ -21,6 +24,29 @@
 	let confirmDelete = $state<'slots' | 'overlays' | null>(null);
 	let layerPulsingId = $state<string | null>(null);
 	let pulseTimer: ReturnType<typeof setTimeout> | undefined;
+
+	let showRulers = $state(true);
+	let activeGuides = $state<{ type: 'h' | 'v'; pos: number }[]>([]);
+
+	let rulerXTicks = $derived.by(() => {
+		if (!canvasWidth) return [];
+		const ticks: number[] = [];
+		const step = canvasWidth > 2000 ? 200 : canvasWidth > 800 ? 100 : 50;
+		for (let x = 0; x <= canvasWidth; x += step) {
+			ticks.push(x);
+		}
+		return ticks;
+	});
+
+	let rulerYTicks = $derived.by(() => {
+		if (!canvasHeight) return [];
+		const ticks: number[] = [];
+		const step = canvasHeight > 2000 ? 200 : canvasHeight > 800 ? 100 : 50;
+		for (let y = 0; y <= canvasHeight; y += step) {
+			ticks.push(y);
+		}
+		return ticks;
+	});
 
 	interface CanvasPreset {
 		id: number;
@@ -86,8 +112,8 @@
 
 	let bgNaturalWidth = $state(0);
 	let bgNaturalHeight = $state(0);
-	let bgOffsetX = $state(data.template?.bg_offset_x ?? 0);
-	let bgOffsetY = $state(data.template?.bg_offset_y ?? 0);
+	let bgOffsetX = $state(initialTemplate?.bg_offset_x ?? 0);
+	let bgOffsetY = $state(initialTemplate?.bg_offset_y ?? 0);
 
 	let bgCoverStyle = $derived.by(() => {
 		if (!backgroundPath || !bgNaturalWidth || !bgNaturalHeight || !canvasWidth || !canvasHeight) return '';
@@ -452,38 +478,97 @@
 		if (ds.type === 'bg-move') {
 			bgOffsetX = Math.round(ds.origX + dx);
 			bgOffsetY = Math.round(ds.origY + dy);
-		} else if (ds.type === 'move') {
-			const nx = ds.origX + dx;
-			const ny = ds.origY + dy;
+		} else if (ds.type === 'move' || ds.type === 'resize') {
+			let nx = ds.origX;
+			let ny = ds.origY;
+			let nw = ds.origW;
+			let nh = ds.origH;
+
+			if (ds.type === 'move') {
+				nx = ds.origX + dx;
+				ny = ds.origY + dy;
+			} else if (ds.type === 'resize') {
+				const handle = ds.handle!;
+				if (handle.includes('e')) nw = Math.max(50, ds.origW + dx);
+				if (handle.includes('w')) { nw = Math.max(50, ds.origW - dx); nx = ds.origX + dx; }
+				if (handle.includes('s')) nh = Math.max(50, ds.origH + dy);
+				if (handle.includes('n')) { nh = Math.max(50, ds.origH - dy); ny = ds.origY + dy; }
+			}
+
+			// Smart alignment snapping
+			const newGuides: { type: 'h' | 'v'; pos: number }[] = [];
+			if (showRulers) {
+				const SNAP = 6; // snap threshold in canvas px
+				const eid = ds.elementId;
+
+				// Gather target snap lines
+				const targetX: number[] = [0, canvasWidth / 2, canvasWidth];
+				const targetY: number[] = [0, canvasHeight / 2, canvasHeight];
+
+				slots.forEach((s, i) => {
+					if (eid !== 'slot-' + (i + 1)) {
+						targetX.push(s.x, s.x + s.width / 2, s.x + s.width);
+						targetY.push(s.y, s.y + s.height / 2, s.y + s.height);
+					}
+				});
+				overlays.forEach(o => {
+					if (eid !== o.id) {
+						targetX.push(o.x, o.x + o.width / 2, o.x + o.width);
+						targetY.push(o.y, o.y + o.height / 2, o.y + o.height);
+					}
+				});
+
+				// Test X points
+				const testX = [
+					{ point: nx, offset: 0 },
+					{ point: nx + nw / 2, offset: nw / 2 },
+					{ point: nx + nw, offset: nw }
+				];
+				let snappedX = false;
+				for (const tx of targetX) {
+					for (const test of testX) {
+						if (Math.abs(test.point - tx) < SNAP) {
+							nx = tx - test.offset;
+							newGuides.push({ type: 'v', pos: Math.round(tx) });
+							snappedX = true;
+							break;
+						}
+					}
+					if (snappedX) break;
+				}
+
+				// Test Y points
+				const testY = [
+					{ point: ny, offset: 0 },
+					{ point: ny + nh / 2, offset: nh / 2 },
+					{ point: ny + nh, offset: nh }
+				];
+				let snappedY = false;
+				for (const ty of targetY) {
+					for (const test of testY) {
+						if (Math.abs(test.point - ty) < SNAP) {
+							ny = ty - test.offset;
+							newGuides.push({ type: 'h', pos: Math.round(ty) });
+							snappedY = true;
+							break;
+						}
+					}
+					if (snappedY) break;
+				}
+			}
+			activeGuides = newGuides;
+
 			const eid = ds.elementId;
 			if (!eid) return;
 
 			if (eid.startsWith('slot-')) {
 				const idx = parseInt(eid.replace('slot-', '')) - 1;
 				if (idx >= 0 && idx < slots.length) {
-					slots = slots.map((s, i) => i === idx ? { ...s, x: nx, y: ny } : s);
+					slots = slots.map((s, i) => i === idx ? { ...s, x: Math.round(nx), y: Math.round(ny), width: Math.round(nw), height: Math.round(nh) } : s);
 				}
 			} else {
 				overlays = overlays.map(o =>
-					o.id === eid ? { ...o, x: nx, y: ny } : o
-				);
-			}
-		} else if (ds.type === 'resize') {
-			const handle = ds.handle!;
-			let nx = ds.origX, ny = ds.origY, nw = ds.origW, nh = ds.origH;
-			if (handle.includes('e')) nw = Math.max(50, ds.origW + dx);
-			if (handle.includes('w')) { nw = Math.max(50, ds.origW - dx); nx = ds.origX + dx; }
-			if (handle.includes('s')) nh = Math.max(50, ds.origH + dy);
-			if (handle.includes('n')) { nh = Math.max(50, ds.origH - dy); ny = ds.origY + dy; }
-
-			if (ds.elementId!.startsWith('slot-')) {
-				const idx = parseInt(ds.elementId!.replace('slot-', '')) - 1;
-				if (idx >= 0 && idx < slots.length) {
-					slots = slots.map((s, i) => i === idx ? { ...s, x: nx, y: ny, width: nw, height: nh } : s);
-				}
-			} else {
-				overlays = overlays.map(o =>
-					o.id === ds.elementId ? { ...o, x: nx, y: ny, width: nw, height: nh } : o
+					o.id === eid ? { ...o, x: Math.round(nx), y: Math.round(ny), width: Math.round(nw), height: Math.round(nh) } : o
 				);
 			}
 		} else if (ds.type === 'canvas-resize') {
@@ -500,7 +585,9 @@
 
 	function handlePointerUp() {
 		dragState = null;
+		activeGuides = [];
 	}
+
 
 	function handleBgPointerDown(e: PointerEvent) {
 		e.stopPropagation();
@@ -637,6 +724,15 @@
 				<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>
 				+Overlay
 			</button>
+			<button
+				class="tool-btn"
+				class:active={showRulers}
+				onclick={() => (showRulers = !showRulers)}
+				title="Toggle Ruler & Smart Snapping"
+			>
+				<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12h20"/><path d="M6 12v-3"/><path d="M10 12v-2"/><path d="M14 12v-3"/><path d="M18 12v-2"/></svg>
+				Ruler & Snap
+			</button>
 			{#if selectedId}
 				{#if selectedId.startsWith('slot-')}
 					<button
@@ -658,11 +754,15 @@
 
 		<div
 			class="canvas-container"
+			role="application"
+			aria-label="Editor Canvas"
 			bind:this={canvasEl}
 			onpointermove={handlePointerMove}
 			onpointerup={handlePointerUp}
 			onpointerleave={handlePointerUp}
 			onclick={handleCanvasClick}
+			onkeydown={(e) => { if (e.key === 'Enter') handleCanvasClick(e as any) }}
+			tabindex="0"
 		>
 			{#if !backgroundPath}
 				<div class="canvas-empty">
@@ -672,16 +772,44 @@
 			{:else}
 				{@const scale = getCanvasScale()}
 				<div class="canvas-resize-wrap" style="width: {canvasWidth * scale}px; height: {canvasHeight * scale}px;">
+					{#if showRulers}
+						<div class="ruler ruler-top">
+							{#each rulerXTicks as x}
+								<div class="ruler-tick" style="left: {x * scale}px;">
+									<span class="ruler-label">{x}</span>
+								</div>
+							{/each}
+						</div>
+						<div class="ruler ruler-left">
+							{#each rulerYTicks as y}
+								<div class="ruler-tick" style="top: {y * scale}px;">
+									<span class="ruler-label">{y}</span>
+								</div>
+							{/each}
+						</div>
+					{/if}
 					<div
 						class="canvas-inner"
 						style="width: {canvasWidth}px; height: {canvasHeight}px; transform: scale({scale}); transform-origin: top left;"
 					>
 					<img src={backgroundPath} alt="BG" class="bg-img" draggable="false" style={bgCoverStyle} onpointerdown={(e) => handleBgPointerDown(e)} />
 
+					{#if showRulers && activeGuides.length > 0}
+						{#each activeGuides as guide}
+							{#if guide.type === 'v'}
+								<div class="smart-guide vertical" style="left: {guide.pos}px;"></div>
+							{:else}
+								<div class="smart-guide horizontal" style="top: {guide.pos}px;"></div>
+							{/if}
+						{/each}
+					{/if}
+
 					{#each slots as slot, i}
 						{@const sid = 'slot-' + (i + 1)}
 						<div
 							class="slot-el"
+							role="button"
+							tabindex="-1"
 							class:selected={selectedId === sid}
 							class:layer-pulsing={layerPulsingId === sid}
 							style="left: {slot.x}px; top: {slot.y}px; width: {slot.width}px; height: {slot.height}px;"
@@ -698,6 +826,10 @@
 								{#each ['nw', 'ne', 'sw', 'se', 'n', 's', 'e', 'w'] as handle}
 									<div
 										class="resize-handle {handle}"
+										role="slider"
+										aria-label="Resize slot"
+										aria-valuenow={0}
+										tabindex="-1"
 										onpointerdown={(e) => handleResizePointerDown(e, 'slot', sid, handle)}
 									></div>
 								{/each}
@@ -708,6 +840,8 @@
 					{#each overlays as ov, i}
 						<div
 							class="overlay-el"
+							role="button"
+							tabindex="-1"
 							class:selected={selectedId === ov.id}
 							class:layer-pulsing={layerPulsingId === ov.id}
 							style="left: {ov.x}px; top: {ov.y}px; width: {ov.width}px; height: {ov.height}px; transform: rotate({ov.rotation}deg);"
@@ -719,6 +853,10 @@
 								{#each ['nw', 'ne', 'sw', 'se', 'n', 's', 'e', 'w'] as handle}
 									<div
 										class="resize-handle {handle}"
+										role="slider"
+										aria-label="Resize overlay"
+										aria-valuenow={0}
+										tabindex="-1"
 										onpointerdown={(e) => handleResizePointerDown(e, 'overlay', ov.id, handle)}
 									></div>
 								{/each}
@@ -730,6 +868,10 @@
 					{#each ['nw', 'ne', 'sw', 'se'] as handle}
 						<div
 							class="canvas-resize-handle {handle}"
+							role="slider"
+							aria-label="Resize canvas"
+							aria-valuenow={0}
+							tabindex="-1"
 							onpointerdown={(e) => handleCanvasResizePointerDown(e, handle)}
 						></div>
 					{/each}
@@ -1120,6 +1262,90 @@
 		cursor: not-allowed;
 		border-style: solid;
 	}
+	.tool-btn.active {
+		background: #e0e7ff;
+		border-color: #6366f1;
+		color: #4338ca;
+	}
+	.ruler {
+		position: absolute;
+		pointer-events: none;
+		user-select: none;
+		z-index: 5;
+	}
+	.ruler-top {
+		top: -24px;
+		left: 0;
+		right: 0;
+		height: 20px;
+		border-bottom: 1px solid #cbd5e1;
+		background: rgba(255, 255, 255, 0.9);
+		backdrop-filter: blur(4px);
+		border-radius: 4px 4px 0 0;
+	}
+	.ruler-top .ruler-tick {
+		position: absolute;
+		top: 10px;
+		bottom: 0;
+		width: 1px;
+		background: #94a3b8;
+	}
+	.ruler-top .ruler-label {
+		position: absolute;
+		top: -10px;
+		left: 2px;
+		font-size: 0.6rem;
+		font-weight: 600;
+		color: #64748b;
+		white-space: nowrap;
+	}
+	.ruler-left {
+		top: 0;
+		bottom: 0;
+		left: -24px;
+		width: 20px;
+		border-right: 1px solid #cbd5e1;
+		background: rgba(255, 255, 255, 0.9);
+		backdrop-filter: blur(4px);
+		border-radius: 4px 0 0 4px;
+	}
+	.ruler-left .ruler-tick {
+		position: absolute;
+		left: 10px;
+		right: 0;
+		height: 1px;
+		background: #94a3b8;
+	}
+	.ruler-left .ruler-label {
+		position: absolute;
+		left: -18px;
+		top: 1px;
+		font-size: 0.6rem;
+		font-weight: 600;
+		color: #64748b;
+		white-space: nowrap;
+		transform: rotate(-90deg);
+		transform-origin: right top;
+	}
+	.smart-guide {
+		position: absolute;
+		pointer-events: none;
+		z-index: 99;
+	}
+	.smart-guide.vertical {
+		top: 0;
+		bottom: 0;
+		width: 1.5px;
+		background: #ec4899;
+		box-shadow: 0 0 6px rgba(236, 72, 153, 0.8);
+	}
+	.smart-guide.horizontal {
+		left: 0;
+		right: 0;
+		height: 1.5px;
+		background: #ec4899;
+		box-shadow: 0 0 6px rgba(236, 72, 153, 0.8);
+	}
 	.canvas-resize-wrap {
 		position: relative;
 		display: inline-block;
@@ -1204,22 +1430,22 @@
 	}
 	.resize-handle {
 		position: absolute;
-		width: 10px;
-		height: 10px;
+		width: 16px;
+		height: 16px;
 		background: #4f46e5;
 		border: 1px solid #fff;
 		border-radius: 2px;
 		z-index: 10;
 		cursor: pointer;
 	}
-	.resize-handle.nw { top: -5px; left: -5px; cursor: nw-resize; }
-	.resize-handle.ne { top: -5px; right: -5px; cursor: ne-resize; }
-	.resize-handle.sw { bottom: -5px; left: -5px; cursor: sw-resize; }
-	.resize-handle.se { bottom: -5px; right: -5px; cursor: se-resize; }
-	.resize-handle.n { top: -5px; left: 50%; margin-left: -5px; cursor: n-resize; }
-	.resize-handle.s { bottom: -5px; left: 50%; margin-left: -5px; cursor: s-resize; }
-	.resize-handle.e { right: -5px; top: 50%; margin-top: -5px; cursor: e-resize; }
-	.resize-handle.w { left: -5px; top: 50%; margin-top: -5px; cursor: w-resize; }
+	.resize-handle.nw { top: -8px; left: -8px; cursor: nw-resize; }
+	.resize-handle.ne { top: -8px; right: -8px; cursor: ne-resize; }
+	.resize-handle.sw { bottom: -8px; left: -8px; cursor: sw-resize; }
+	.resize-handle.se { bottom: -8px; right: -8px; cursor: se-resize; }
+	.resize-handle.n { top: -8px; left: 50%; margin-left: -8px; cursor: n-resize; }
+	.resize-handle.s { bottom: -8px; left: 50%; margin-left: -8px; cursor: s-resize; }
+	.resize-handle.e { right: -8px; top: 50%; margin-top: -8px; cursor: e-resize; }
+	.resize-handle.w { left: -8px; top: 50%; margin-top: -8px; cursor: w-resize; }
 	.canvas-resize-handle {
 		position: absolute;
 		width: 12px;

@@ -1,12 +1,12 @@
 import { json } from '@sveltejs/kit';
 import { getDb, invalidateTemplateCache } from '$lib/server/db';
 import type { RequestHandler } from './$types';
-import type { Slot, Overlay } from '$lib/data/admin-types';
+import type { Slot, Overlay, TemplateDbRow, TemplateRecord } from '$lib/data/admin-types';
 
 export const GET: RequestHandler = async () => {
 	const db = getDb();
-	const rows = db.prepare('SELECT * FROM templates ORDER BY updated_at DESC').all() as any[];
-	const templates = rows.map(r => ({
+	const rows = db.prepare('SELECT * FROM templates ORDER BY updated_at DESC').all() as TemplateDbRow[];
+	const templates: TemplateRecord[] = rows.map(r => ({
 		...r,
 		slots: JSON.parse(r.slots || '[]'),
 		overlays: JSON.parse(r.overlays || '[]')
@@ -45,7 +45,7 @@ export const POST: RequestHandler = async ({ request }) => {
 			bg_offset_y
 		);
 
-	const row = db.prepare('SELECT * FROM templates WHERE id = ?').get(result.lastInsertRowid) as any;
+	const row = db.prepare('SELECT * FROM templates WHERE id = ?').get(result.lastInsertRowid) as TemplateDbRow;
 	invalidateTemplateCache(Number(result.lastInsertRowid));
 	return json({
 		...row,

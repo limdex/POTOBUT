@@ -26,7 +26,7 @@ export class Libgphoto2Driver implements CameraDriver {
 	private _onFrame: ((buf: Buffer) => void) | null = null;
 	private _frameLogCount = 0;
 
-	private _send(cmd: Record<string, any>): Promise<WorkerMsg> {
+	private _send(cmd: Record<string, unknown>): Promise<WorkerMsg> {
 		return new Promise((resolve) => {
 			const id = String(++this._nextId);
 			this._pending.set(id, resolve);
@@ -117,8 +117,9 @@ export class Libgphoto2Driver implements CameraDriver {
 
 			console.log('[libgphoto2] Worker ready, camera connected');
 			return true;
-		} catch (e: any) {
-			console.log('[libgphoto2] Detect error:', e?.message);
+		} catch (e: unknown) {
+			const msg = e instanceof Error ? e.message : String(e);
+			console.log('[libgphoto2] Detect error:', msg);
 			return false;
 		}
 	}

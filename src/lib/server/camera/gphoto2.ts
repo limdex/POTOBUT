@@ -1,4 +1,4 @@
-import { spawnSync, spawn, type ChildProcess } from 'child_process';
+import { spawnSync, spawn, type ChildProcess, type StdioOptions } from 'child_process';
 import { openSync, readSync as fsReadSync, closeSync, statSync, unlinkSync, existsSync, readFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
@@ -8,20 +8,26 @@ function toMsysPath(p: string): string {
 	return p.replace(/\\/g, '/');
 }
 
-const GPHOTO2_EXE = process.platform === 'win32'
-	? toMsysPath(join('C:', 'msys64', 'mingw64', 'bin', 'gphoto2.exe'))
-	: 'gphoto2';
+function findMsysBash(): string | null {
+	const candidates = [
+		'C:\\msys64\\usr\\bin\\bash.exe',
+		'C:\\Program Files\\Git\\bin\\bash.exe',
+		'C:\\Git\\bin\\bash.exe'
+	];
+	for (const c of candidates) {
+		if (existsSync(c)) return c;
+	}
+	return null;
+}
 
-const MSYS2_BASH = process.platform === 'win32'
-	? toMsysPath(join('C:', 'msys64', 'usr', 'bin', 'bash.exe'))
-	: null;
+const MSYS2_BASH = findMsysBash();
+const GPHOTO2_EXE = 'gphoto2';
+const GPHOTO_ENV = { ...process.env, PATH: `/usr/bin:${process.env.PATH || ''}` };
 
 const MOVIE_CWD = process.platform === 'win32'
 	? join('C:', 'msys64', 'tmp')
 	: tmpdir();
 const MOVIE_FILE = join(MOVIE_CWD, 'movie.mjpg');
-
-const GPHOTO_ENV = { ...process.env, MSYS_NO_PATHCONV: '1' } as Record<string, string>;
 
 const SOI = Buffer.from([0xFF, 0xD8]);
 const EOI = Buffer.from([0xFF, 0xD9]);
@@ -41,7 +47,7 @@ function extractLastJpeg(buf: Buffer): Buffer | null {
 	return last;
 }
 
-function runGphoto2(args: string[], opts?: { timeout?: number; stdio?: any }): Buffer {
+function runGphoto2(args: string[], opts?: { timeout?: number; stdio?: StdioOptions }): Buffer {
 	let r;
 	if (process.platform === 'win32') {
 		const escapedArgs = args.map(a => a.replace(/"/g, '\\"')).join(' ');
@@ -280,8 +286,9 @@ export class Gphoto2Driver implements CameraDriver {
 			console.log('[CAMERA] Settings applied OK');
 			const stdout = out.toString().trim();
 			if (stdout) console.log('[CAMERA] Settings output:', stdout);
-		} catch (e: any) {
-			const stderr = e?.stderr?.toString()?.trim() || e?.message || '';
+		} catch (e: unknown) {
+			const err = e as { stderr?: Buffer; message?: string };
+			const stderr = err?.stderr?.toString()?.trim() || err?.message || '';
 			console.log('[CAMERA] Settings failed:', stderr);
 		}
 	}
@@ -308,9 +315,10 @@ export class Gphoto2Driver implements CameraDriver {
 			const ab = new ArrayBuffer(buf.length);
 			new Uint8Array(ab).set(buf);
 			return ab;
-		} catch (e: any) {
-			const stderr = e?.stderr?.toString()?.trim() || '';
-			console.log('[CAMERA] Capture failed:', e?.message || e);
+		} catch (e: unknown) {
+			const err = e as { stderr?: Buffer; message?: string };
+			const stderr = err?.stderr?.toString()?.trim() || '';
+			console.log('[CAMERA] Capture failed:', err?.message || err);
 			if (stderr) console.log('[CAMERA] Capture stderr:', stderr);
 			return null;
 		}

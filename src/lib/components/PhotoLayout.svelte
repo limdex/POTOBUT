@@ -1,12 +1,13 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import type { CapturedPhoto } from '$lib/stores/shoot.svelte';
+	import type { TemplateRecord } from '$lib/data/admin-types';
 
 	let {
 		template,
 		photos
 	}: {
-		template: any;
+		template: TemplateRecord;
 		photos: CapturedPhoto[];
 	} = $props();
 

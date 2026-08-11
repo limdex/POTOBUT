@@ -30,5 +30,20 @@ export interface TemplateRecord {
 	updated_at: string;
 }
 
+export interface TemplateDbRow {
+	id: number;
+	name: string;
+	canvas_width: number;
+	canvas_height: number;
+	background_path: string;
+	slot_count: number;
+	slots: string;
+	overlays: string;
+	bg_offset_x: number;
+	bg_offset_y: number;
+	created_at: string;
+	updated_at: string;
+}
+
 export const SLOT_WIDTH = 500;
 export const SLOT_HEIGHT = 400;

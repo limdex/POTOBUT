@@ -3,20 +3,26 @@
 	import { goto } from '$app/navigation';
 	import { shootState } from '$lib/stores/shoot.svelte';
 	import { paperSizes } from '$lib/data/paper-sizes';
+	import type { Overlay } from '$lib/data/admin-types';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
-	const template = data.template;
-	const slots = $derived(template.slots || []);
-	const overlays = $derived(template.overlays || []);
+	let template = $derived(data.template);
+	let slots = $derived(template.slots || []);
+	let overlays = $derived(template.overlays || []);
 
 	interface Transform { scale: number; offsetX: number; offsetY: number }
 
-	let transforms = $state<Transform[]>(slots.map(() => ({ scale: 1, offsetX: 0, offsetY: 0 })));
+	let transforms = $state<Transform[]>([]);
+	$effect(() => {
+		if (transforms.length !== slots.length) {
+			transforms = slots.map(() => ({ scale: 1, offsetX: 0, offsetY: 0 }));
+		}
+	});
 	let selectedSlot = $state<number | null>(null);
 	let bgImg = $state<HTMLImageElement | null>(null);
 	let photoImgs = $state<(HTMLImageElement | null)[]>([]);
-	let overlayImgs = $state<HTMLImageElement[]>([]);
+	let overlayImgs = $state<(HTMLImageElement | null)[]>([]);
 	let canvasEl = $state<HTMLCanvasElement | undefined>(undefined);
 	let ready = $state(false);
 	let loadError = $state(false);
@@ -365,7 +371,7 @@
 			);
 			photoImgs = loadedPhotos;
 			const loadedOvs = await Promise.all(
-				overlays.map((ov: any) => loadImage(ov.src).catch(() => null))
+				overlays.map((ov: Overlay) => loadImage(ov.src).catch(() => null))
 			);
 			overlayImgs = loadedOvs;
 			ready = true;
@@ -442,11 +448,11 @@
 	{/if}
 
 	{#if showPaperModal}
-		<div class="modal-overlay" onclick={() => showPaperModal = false}>
-			<div class="modal-panel" onclick={(e) => e.stopPropagation()}>
+		<div class="modal-overlay" role="presentation" onclick={() => showPaperModal = false} onkeydown={(e) => e.key === 'Escape' && (showPaperModal = false)}>
+			<div class="modal-panel" role="dialog" aria-modal="true" tabindex="-1" onclick={(e) => e.stopPropagation()} onkeydown={() => {}}>
 				<div class="modal-header">
 					<h3>Pilih Kertas</h3>
-					<button class="modal-close" onclick={() => showPaperModal = false}>
+					<button class="modal-close" aria-label="Tutup modal" onclick={() => showPaperModal = false}>
 						<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
 					</button>
 				</div>
@@ -561,6 +567,7 @@
 	.zoom-slider {
 		flex: 1;
 		-webkit-appearance: none;
+		appearance: none;
 		height: 6px;
 		border-radius: 3px;
 		background: #334155;
@@ -568,6 +575,7 @@
 	}
 	.zoom-slider::-webkit-slider-thumb {
 		-webkit-appearance: none;
+		appearance: none;
 		width: 20px;
 		height: 20px;
 		border-radius: 50%;

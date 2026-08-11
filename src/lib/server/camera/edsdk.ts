@@ -101,7 +101,7 @@ export class EdsdkDriver implements CameraDriver {
 		if (this._edsdk) return;
 		this._edsdk = koffiLoad(this._dllPath);
 		const ucrt = koffiLoad('ucrtbase.dll');
-		this._memcpyFn = ucrt.func('void *memcpy(void *dst, void *src, uint64_t len)') as any;
+		this._memcpyFn = ucrt.func('void *memcpy(void *dst, void *src, uint64_t len)') as (dst: unknown, src: unknown, len: number) => unknown;
 	}
 
 	private _resolveFns(): void {

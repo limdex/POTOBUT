@@ -23,12 +23,12 @@ const drivers: CameraDriver[] = [
 	new GoProDriver()
 ];
 
-const _g = globalThis as any;
-let _activeDriver: CameraDriver | null = _g.__camDriver ?? null;
-let _info: CameraInfo = _g.__camInfo ?? { connected: false };
+const _g = globalThis as unknown as Record<string, unknown>;
+let _activeDriver: CameraDriver | null = (_g.__camDriver as CameraDriver | null) ?? null;
+let _info: CameraInfo = (_g.__camInfo as CameraInfo) ?? { connected: false };
 let _capturing = false;
 let _liveFeedActive = false;
-const _subscribers: Set<(buf: Buffer) => void> = _g.__camSubs ?? new Set();
+const _subscribers: Set<(buf: Buffer) => void> = (_g.__camSubs as Set<(buf: Buffer) => void> | undefined) ?? new Set();
 
 _g.__camSubs = _subscribers;
 

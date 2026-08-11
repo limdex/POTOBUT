@@ -1,10 +1,11 @@
 import { json } from '@sveltejs/kit';
 import { getDb, invalidateTemplateCache } from '$lib/server/db';
 import type { RequestHandler } from './$types';
+import type { TemplateDbRow } from '$lib/data/admin-types';
 
 export const GET: RequestHandler = async ({ params }) => {
 	const db = getDb();
-	const row = db.prepare('SELECT * FROM templates WHERE id = ?').get(Number(params.id)) as any;
+	const row = db.prepare('SELECT * FROM templates WHERE id = ?').get(Number(params.id)) as TemplateDbRow | undefined;
 	if (!row) return json({ error: 'Not found' }, { status: 404 });
 	return json({
 		...row,
@@ -59,7 +60,7 @@ export const PUT: RequestHandler = async ({ params, request }) => {
 	);
 	invalidateTemplateCache(Number(params.id));
 
-	const row = db.prepare('SELECT * FROM templates WHERE id = ?').get(Number(params.id)) as any;
+	const row = db.prepare('SELECT * FROM templates WHERE id = ?').get(Number(params.id)) as TemplateDbRow;
 	return json({
 		...row,
 		slots: JSON.parse(row.slots),

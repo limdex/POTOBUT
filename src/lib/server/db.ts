@@ -3,12 +3,14 @@ import { dev } from '$app/environment';
 import { existsSync, mkdirSync } from 'fs';
 import { dirname } from 'path';
 
+import type { TemplateRecord, TemplateDbRow } from '$lib/data/admin-types';
+
 const DB_PATH = dev ? 'database/potobut.db' : 'data/potobut.db';
 
 let db: Database.Database;
 let _schemaInit = false;
 
-const _templateCache = new Map<number, any>();
+const _templateCache = new Map<number, TemplateRecord>();
 
 export function getDb(): Database.Database {
 	if (!db) {
@@ -92,12 +94,12 @@ export function deleteCanvasPresetDb(id: number): boolean {
 	return info.changes > 0;
 }
 
-export function getParsedTemplate(id: number) {
-	if (_templateCache.has(id)) return _templateCache.get(id);
+export function getParsedTemplate(id: number): TemplateRecord | null {
+	if (_templateCache.has(id)) return _templateCache.get(id)!;
 	const db = getDb();
-	const row = db.prepare('SELECT * FROM templates WHERE id = ?').get(id) as any;
+	const row = db.prepare('SELECT * FROM templates WHERE id = ?').get(id) as TemplateDbRow | undefined;
 	if (!row) return null;
-	const parsed = {
+	const parsed: TemplateRecord = {
 		...row,
 		slots: JSON.parse(row.slots || '[]'),
 		overlays: JSON.parse(row.overlays || '[]')
