@@ -9,20 +9,20 @@ echo.
 
 cd /d "%~dp0"
 
-where node >nul 2>&1
+where bun >nul 2>&1
 if errorlevel 1 (
-    echo [x] Node.js tidak ditemukan - jalankan setup.bat dulu!
+    echo [x] Bun tidak ditemukan - jalankan setup.bat dulu!
     echo.
     pause
     exit /b 1
 )
 
 if not exist "node_modules" (
-    echo [!] node_modules belum ada, update dulu ^(git pull + npm install^)...
+    echo [!] node_modules belum ada, update dulu ^(git pull + bun install^)...
     git pull origin master
-    call npm install
+    call bun install
     if errorlevel 1 (
-        echo [x] npm install gagal.
+        echo [x] bun install gagal.
         echo.
         pause
         exit /b 1
@@ -36,7 +36,7 @@ if not exist "C:\msys64\mingw64\bin\libgphoto2-6.dll" (
 )
 
 echo [1/4] Memeriksa kamera...
-node scripts/check-camera.cjs
+bun run scripts/check-camera.cjs
 if errorlevel 1 (
     echo.
     echo [x] Kamera belum siap - aplikasi tidak bisa dijalankan.
@@ -48,7 +48,7 @@ if errorlevel 1 (
 echo.
 
 echo [2/4] Memeriksa printer...
-node scripts/check-printer.cjs
+bun run scripts/check-printer.cjs
 echo.
 
 echo [3/4] Memeriksa build aplikasi...
@@ -60,7 +60,7 @@ if exist "build\.build-hash" for /f "delims=" %%h in (build\.build-hash) do set 
 if defined HEAD_HASH (
     if not "%HEAD_HASH%"=="%BUILD_HASH%" (
         echo     [!] Kode berubah sejak build terakhir, membangun ulang...
-        call npm run build
+        call bun run build
         if errorlevel 1 (
             echo     [x] Gagal membangun aplikasi.
             echo.
@@ -75,7 +75,7 @@ if defined HEAD_HASH (
 ) else (
     if not exist "build" (
         echo     [!] Build belum ada, membangun ulang...
-        call npm run build
+        call bun run build
         if errorlevel 1 (
             echo     [x] Gagal membangun aplikasi.
             echo.
@@ -99,7 +99,7 @@ echo.
 set "PORT=4173"
 set "BODY_SIZE_LIMIT=5M"
 start "" "http://localhost:4173"
-call npm run preview
+call bun run preview
 
 echo.
 echo [x] Aplikasi berhenti. Tekan tombol untuk menutup.

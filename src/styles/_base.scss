@@ -1,0 +1,59 @@
+@use 'variables' as *;
+
+:root {
+	font-family: $font-text;
+	--bg: #{$color-bg};
+	--ease-apple: #{$ease-apple};
+	--ease-spring: #{$ease-spring};
+}
+
+* { 
+	box-sizing: border-box; 
+	-webkit-tap-highlight-color: transparent;
+}
+
+body {
+	margin: 0;
+	background: var(--bg);
+	color: $color-text;
+	font-family: $font-text;
+	-webkit-font-smoothing: antialiased;
+	-moz-osx-font-smoothing: grayscale;
+	text-rendering: optimizeLegibility;
+	letter-spacing: -0.01em;
+}
+
+h1, h2, h3, h4, h5, h6 {
+	font-family: $font-display;
+}
+
+button, input, textarea, select {
+	font-family: inherit;
+}
+
+::selection {
+	background: rgba(10, 132, 255, 0.35);
+	color: #ffffff;
+}
+
+// Apple-style Minimal Scrollbars
+::-webkit-scrollbar {
+	width: 8px;
+	height: 8px;
+}
+
+::-webkit-scrollbar-track {
+	background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+	background: rgba(255, 255, 255, 0.18);
+	border-radius: 9999px;
+	border: 2px solid transparent;
+	background-clip: content-box;
+
+	&:hover {
+		background-color: rgba(255, 255, 255, 0.3);
+	}
+}
+

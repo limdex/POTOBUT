@@ -9,9 +9,9 @@ echo.
 
 cd /d "%~dp0"
 
-where node >nul 2>&1
+where bun >nul 2>&1
 if errorlevel 1 (
-    echo [x] Node.js tidak ditemukan - jalankan setup.bat dulu cok!
+    echo [x] Bun tidak ditemukan - jalankan setup.bat dulu cok!
     echo.
     pause
     exit /b 1
@@ -24,18 +24,18 @@ if errorlevel 1 (
 )
 echo.
 
-echo [2/3] Menginstall / memperbarui dependensi (npm install)...
-call npm install
+echo [2/3] Menginstall / memperbarui dependensi (bun install)...
+call bun install
 if errorlevel 1 (
-    echo [x] npm install gagal.
+    echo [x] bun install gagal.
     echo.
     pause
     exit /b 1
 )
 echo.
 
-echo [3/3] Memeriksa integritas kode (npm run check)...
-call npm run check
+echo [3/3] Memeriksa integritas kode (bun run check)...
+call bun run check
 echo.
 
 echo ============================================================

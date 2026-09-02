@@ -3,10 +3,10 @@
 ## Dev commands
 
 ```sh
-npm run dev          # start dev server
-npm run build        # production build
-npm run preview      # preview production build
-npm run check        # typecheck (svelte-check)
+bun run dev          # start dev server
+bun run build        # production build
+bun run preview      # preview production build
+bun run check        # typecheck (svelte-check)
 ```
 
 ## Routes

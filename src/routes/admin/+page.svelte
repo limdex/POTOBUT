@@ -83,30 +83,30 @@
 	<title>Admin — potobut</title>
 </svelte:head>
 
-<div class="admin-page">
+<div class="container">
 	{#if templates.length === 0}
-		<div class="empty">
+		<div class="empty-state">
 			<div class="empty-icon">
 				<svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5-5 5"/></svg>
 			</div>
 			<h2>Belum ada template</h2>
 			<p>Bikin dulu cok!</p>
-			<button class="btn" onclick={() => goto('/admin/editor')}>Buat Template</button>
-			<button class="btn-outline" onclick={() => goto('/templates')}>Buka Aplikasi</button>
-			<button class="gear-btn empty-gear" onclick={() => showSettings = true} aria-label="Pengaturan Hardware">
+			<button class="btn btn-md" onclick={() => goto('/admin/editor')}>Buat Template</button>
+			<button class="btn btn-outline btn-md" onclick={() => goto('/templates')}>Buka Aplikasi</button>
+			<button class="btn btn-outline btn-md btn-icon empty-gear" style="color: var(--color-text-muted, #8e8e93);" onclick={() => showSettings = true} aria-label="Pengaturan Hardware">
 				<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
 			</button>
 		</div>
 	{:else}
-		<div class="header">
+		<div class="page-header is-flex">
 			<h1>Template</h1>
-			<button class="btn" onclick={() => goto('/admin/editor')}>+ Baru</button>
-			<button class="btn-outline" onclick={() => goto('/templates')}>Buka Aplikasi</button>
-			<button class="gear-btn" onclick={() => showSettings = true} aria-label="Pengaturan Hardware">
+			<button class="btn btn-md" onclick={() => goto('/admin/editor')}>Baru</button>
+			<button class="btn btn-outline btn-md" onclick={() => goto('/templates')}>Buka Aplikasi</button>
+			<button class="btn btn-outline btn-md btn-icon" style="color: var(--color-text-muted, #8e8e93);" onclick={() => showSettings = true} aria-label="Pengaturan Hardware">
 				<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
 			</button>
 		</div>
-		<div class="grid">
+		<div class="grid-responsive">
 			{#each templates as tpl (tpl.id)}
 				<div class="card" role="button" tabindex="0" onclick={() => goto(`/admin/editor?id=${tpl.id}`)} onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') goto(`/admin/editor?id=${tpl.id}`); }}>
 					<div class="card-preview">
@@ -194,138 +194,44 @@
 	</div>
 {/if}
 
-<style>
-	.admin-page {
-		min-height: 100dvh;
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		padding: 2rem;
-	}
-	.empty {
-		text-align: center;
-	}
-	.empty-icon {
-		color: #6b7280;
-		margin-bottom: 1rem;
-	}
-	.empty h2 {
-		font-size: 1.3rem;
-		margin: 0 0 0.3rem;
-	}
-	.empty p {
-		color: #6b7280;
-		margin: 0 0 1.5rem;
-	}
-	.header {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		margin-bottom: 1.5rem;
-		width: 100%;
-		max-width: 800px;
-	}
-	.header h1 {
-		flex: 1;
-		margin: 0;
-		font-size: 1.5rem;
-	}
-	.btn {
-		padding: 0.75rem 2rem;
-		border: none;
-		border-radius: 10px;
-		background: #4f46e5;
-		color: #fff;
-		font-weight: 600;
-		font-size: 1rem;
-		cursor: pointer;
-		transition: opacity 0.15s;
-	}
-	.btn:hover { opacity: 0.85; }
-	.btn-outline {
-		padding: 0.75rem 2rem;
-		border: 2px solid #4f46e5;
-		border-radius: 10px;
-		background: transparent;
-		color: #4f46e5;
-		font-weight: 600;
-		font-size: 1rem;
-		cursor: pointer;
-		transition: background 0.15s, color 0.15s;
-	}
-	.btn-outline:hover {
-		background: #4f46e5;
-		color: #fff;
-	}
-	.gear-btn {
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		width: 42px;
-		height: 42px;
-		border: 2px solid #e5e7eb;
-		border-radius: 10px;
-		background: #fff;
-		color: #6b7280;
-		cursor: pointer;
-		transition: border-color 0.15s, color 0.15s;
-	}
-	.gear-btn:hover {
-		border-color: #4f46e5;
-		color: #4f46e5;
-	}
+<style lang="scss">
+	@use '../../styles/variables' as *;
+
+
 	.empty-gear {
-		margin: 1rem auto 0;
+		margin: 1.5rem auto 0;
 	}
-	.grid {
-		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-		gap: 1rem;
-		width: 100%;
-		max-width: 800px;
-	}
-	.card {
-		background: #fff;
-		border: 2px solid #e5e7eb;
-		border-radius: 12px;
-		overflow: hidden;
-		cursor: pointer;
-		transition: border-color 0.15s, box-shadow 0.15s;
-		position: relative;
-	}
-	.card:hover {
-		border-color: #4f46e5;
-		box-shadow: 0 4px 12px rgba(79,70,229,0.12);
-	}
-	.card-preview {
-		aspect-ratio: 2 / 3;
-		background: #f3f4f6;
-		overflow: hidden;
-	}
-	.card-info {
-		padding: 0.7rem;
-	}
-	.card-info h3 {
-		margin: 0;
-		font-size: 0.95rem;
-	}
+
 	.meta {
-		font-size: 0.8rem;
-		color: #9ca3af;
+		font-size: 0.82rem;
+		color: $color-text-muted;
+		letter-spacing: -0.01em;
 	}
 	.delete-btn {
 		position: absolute;
-		top: 0.5rem;
-		right: 0.5rem;
-		background: rgba(239,68,68,0.9);
-		color: #fff;
-		border: none;
-		border-radius: 6px;
-		padding: 0.3rem 0.6rem;
+		top: 0.6rem;
+		right: 0.6rem;
+		z-index: 10;
+		background: rgba(255, 69, 58, 0.88);
+		backdrop-filter: blur(8px);
+		-webkit-backdrop-filter: blur(8px);
+		color: #ffffff;
+		border: 1px solid rgba(255, 255, 255, 0.2);
+		border-radius: 8px;
+		padding: 0.35rem 0.65rem;
 		font-size: 0.75rem;
+		font-weight: 600;
 		cursor: pointer;
 		opacity: 0;
-		transition: opacity 0.15s;
+		box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+		transition: all 0.18s $ease-apple;
+	}
+	.delete-btn:hover {
+		background: $color-danger;
+		transform: scale(1.05);
+	}
+	.delete-btn:active {
+		transform: scale(0.92);
 	}
 	.card:hover .delete-btn {
 		opacity: 1;
@@ -334,20 +240,38 @@
 	.settings-overlay {
 		position: fixed;
 		inset: 0;
-		background: rgba(0,0,0,0.4);
+		background: rgba(0, 0, 0, 0.65);
+		backdrop-filter: blur(20px);
+		-webkit-backdrop-filter: blur(20px);
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		z-index: 100;
+		animation: overlay-fade 0.2s $ease-apple;
 	}
+	@keyframes overlay-fade {
+		from { opacity: 0; }
+		to { opacity: 1; }
+	}
+
 	.settings-panel {
-		background: #fff;
-		border-radius: 16px;
+		background: rgba(30, 41, 59, 0.55);
+		backdrop-filter: blur(40px) saturate(200%);
+		-webkit-backdrop-filter: blur(40px) saturate(200%);
+		border: 1px solid rgba(255, 255, 255, 0.18);
+		border-radius: 24px;
 		padding: 2rem;
 		width: 480px;
 		max-width: 90vw;
-		box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+		box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 20px 40px rgba(0, 0, 0, 0.5);
+		color: $color-text;
+		animation: panel-pop 0.25s $ease-spring;
 	}
+	@keyframes panel-pop {
+		from { opacity: 0; transform: scale(0.94); }
+		to { opacity: 1; transform: scale(1); }
+	}
+
 	.settings-header {
 		display: flex;
 		align-items: center;
@@ -357,23 +281,32 @@
 	.settings-header h2 {
 		flex: 1;
 		margin: 0;
-		font-size: 1.2rem;
+		font-size: 1.25rem;
+		font-weight: 700;
+		letter-spacing: -0.02em;
 	}
 	.close-btn {
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		width: 32px;
-		height: 32px;
+		width: 30px;
+		height: 30px;
 		border: none;
-		border-radius: 8px;
-		background: transparent;
-		color: #6b7280;
+		border-radius: 50%;
+		background: rgba(255, 255, 255, 0.1);
+		color: $color-text-muted;
 		cursor: pointer;
+		transition: all 0.18s $ease-apple;
 	}
 	.close-btn:hover {
-		background: #f3f4f6;
+		background: rgba(255, 255, 255, 0.2);
+		color: #ffffff;
+		transform: scale(1.05);
 	}
+	.close-btn:active {
+		transform: scale(0.92);
+	}
+
 	.device-section {
 		display: flex;
 		flex-direction: column;
@@ -384,8 +317,14 @@
 		align-items: center;
 		gap: 1rem;
 		padding: 1rem;
-		border: 2px solid #e5e7eb;
-		border-radius: 12px;
+		border: 1px solid rgba(255, 255, 255, 0.08);
+		border-radius: 16px;
+		background: rgba(255, 255, 255, 0.035);
+		transition: all 0.2s $ease-apple;
+	}
+	.device-row:hover {
+		background: rgba(255, 255, 255, 0.06);
+		border-color: rgba(255, 255, 255, 0.14);
 	}
 	.device-icon {
 		display: flex;
@@ -393,10 +332,11 @@
 		justify-content: center;
 		width: 44px;
 		height: 44px;
-		border-radius: 10px;
-		background: #f3f4f6;
-		color: #6b7280;
+		border-radius: 12px;
+		background: rgba(255, 255, 255, 0.08);
+		color: #ffffff;
 		flex-shrink: 0;
+		box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
 	}
 	.device-info {
 		flex: 1;
@@ -406,43 +346,64 @@
 		display: block;
 		font-weight: 600;
 		font-size: 0.95rem;
+		letter-spacing: -0.01em;
 		margin-bottom: 0.15rem;
 	}
 	.device-desc {
 		display: block;
 		font-size: 0.82rem;
-		color: #6b7280;
+		color: $color-text-muted;
 	}
 	.status-connected {
-		color: #16a34a;
+		color: #30d158; // Apple iOS system green
 		font-weight: 600;
 	}
 	.status-disconnected {
-		color: #9ca3af;
+		color: $color-text-muted;
 	}
+
 	.action-btn {
-		padding: 0.5rem 1.2rem;
-		border: none;
-		border-radius: 8px;
+		padding: 0.5rem 1.25rem;
+		border-radius: 9999px;
 		font-weight: 600;
 		font-size: 0.85rem;
+		letter-spacing: -0.01em;
 		cursor: pointer;
-		transition: opacity 0.15s;
+		transition: all 0.2s $ease-apple;
 		flex-shrink: 0;
+		user-select: none;
 	}
 	.action-btn:disabled {
-		opacity: 0.5;
+		opacity: 0.4;
 		cursor: not-allowed;
 	}
 	.action-btn.connect {
-		background: #4f46e5;
-		color: #fff;
+		background: $color-primary;
+		border: 1px solid rgba(255, 255, 255, 0.2);
+		color: #ffffff;
+		box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 4px 14px rgba(10, 132, 255, 0.35);
+	}
+	.action-btn.connect:hover:not(:disabled) {
+		background: $color-primary-hover;
+		transform: scale(1.03);
+		box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 6px 18px rgba(10, 132, 255, 0.45);
+	}
+	.action-btn.connect:active:not(:disabled) {
+		transform: scale(0.95);
 	}
 	.action-btn.disconnect {
-		background: #fee2e2;
-		color: #dc2626;
+		background: rgba(255, 69, 58, 0.18);
+		border: 1px solid rgba(255, 69, 58, 0.4);
+		color: #ff6961;
+		box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1);
 	}
-	.action-btn:hover:not(:disabled) {
-		opacity: 0.85;
+	.action-btn.disconnect:hover:not(:disabled) {
+		background: rgba(255, 69, 58, 0.3);
+		border-color: rgba(255, 69, 58, 0.6);
+		transform: scale(1.03);
+	}
+	.action-btn.disconnect:active:not(:disabled) {
+		transform: scale(0.95);
 	}
 </style>
+

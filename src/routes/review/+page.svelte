@@ -394,8 +394,8 @@
 
 <div class="page">
 	<div class="toolbar">
-		<button class="btn outline" onclick={() => { shootState.reset(); goto('/templates'); }}>Ulangi</button>
-		<button class="btn" onclick={cetak} disabled={mencetak || !ready}>{mencetak ? 'Memproses...' : 'Cetak'}</button>
+		<button class="btn btn-outline btn-md" onclick={() => { shootState.reset(); goto('/templates'); }}>Ulangi</button>
+		<button class="btn btn-md" onclick={cetak} disabled={mencetak || !ready}>{mencetak ? 'Memproses...' : 'Cetak'}</button>
 	</div>
 
 	<button class="paper-btn" onclick={() => showPaperModal = true}>
@@ -434,7 +434,7 @@
 					oninput={handleZoomInput}
 					class="zoom-slider"
 				/>
-				<button class="btn-sm" onclick={() => { setZoom(selectedSlot!, 1); }}>Reset</button>
+				<button class="btn btn-outline btn-sm" onclick={() => { setZoom(selectedSlot!, 1); }}>Reset</button>
 			</div>
 		{/if}
 
@@ -499,22 +499,24 @@
 	{/if}
 </div>
 
-<style>
+<style lang="scss">
+	@use '../../styles/variables' as *;
+
 	.page {
 		height: 100dvh;
 		display: flex;
 		flex-direction: column;
-		background: #000;
+		background: $color-bg;
 		box-sizing: border-box;
 		position: relative;
 		overflow: hidden;
 	}
 	.toolbar {
 		position: absolute;
-		top: 1rem;
-		right: 1rem;
+		top: 1.25rem;
+		right: 1.25rem;
 		display: flex;
-		gap: 0.5rem;
+		gap: 0.6rem;
 		z-index: 10;
 	}
 	.photo-wrap {
@@ -523,28 +525,31 @@
 		align-items: center;
 		justify-content: center;
 		min-height: 0;
-		padding: 1rem;
+		padding: 1.5rem;
 	}
 	canvas {
 		max-width: 100%;
 		max-height: 100%;
 		width: auto;
 		height: auto;
-		border-radius: 6px;
+		border-radius: 12px;
 		cursor: pointer;
+		box-shadow: 0 16px 48px rgba(0, 0, 0, 0.7);
 	}
 	.zoom-bar {
 		position: absolute;
 		bottom: 0;
 		left: 0;
 		right: 0;
-		background: rgba(0, 0, 0, 0.95);
-		padding: 0.75rem 1.5rem;
+		background: rgba(30, 41, 59, 0.85);
+		backdrop-filter: blur(24px) saturate(180%);
+		-webkit-backdrop-filter: blur(24px) saturate(180%);
+		padding: 0.85rem 2rem;
 		display: flex;
 		align-items: center;
-		gap: 1rem;
+		gap: 1.25rem;
 		z-index: 10;
-		border-top: 1px solid rgba(255,255,255,0.08);
+		border-top: 1px solid rgba(255, 255, 255, 0.1);
 	}
 	.zoom-info {
 		display: flex;
@@ -553,169 +558,167 @@
 		min-width: 90px;
 	}
 	.zoom-label {
-		font-size: 0.75rem;
-		color: #6b7280;
+		font-size: 0.72rem;
+		color: $color-text-muted;
 		font-weight: 600;
 		text-transform: uppercase;
 		letter-spacing: 0.05em;
 	}
 	.zoom-value {
-		font-size: 1.1rem;
-		color: #fff;
+		font-size: 1.15rem;
+		color: #ffffff;
 		font-weight: 700;
+		letter-spacing: -0.02em;
 	}
 	.zoom-slider {
 		flex: 1;
 		-webkit-appearance: none;
 		appearance: none;
 		height: 6px;
-		border-radius: 3px;
-		background: #334155;
+		border-radius: 9999px;
+		background: rgba(255, 255, 255, 0.15);
 		outline: none;
 	}
 	.zoom-slider::-webkit-slider-thumb {
 		-webkit-appearance: none;
 		appearance: none;
-		width: 20px;
-		height: 20px;
+		width: 22px;
+		height: 22px;
 		border-radius: 50%;
-		background: #4f46e5;
+		background: $color-primary;
 		cursor: pointer;
-		border: 2px solid #fff;
+		border: 2px solid #ffffff;
+		box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+		transition: transform 0.15s $ease-apple;
+	}
+	.zoom-slider::-webkit-slider-thumb:hover {
+		transform: scale(1.15);
 	}
 	.hint {
 		position: absolute;
-		bottom: 1rem;
+		bottom: 1.25rem;
 		left: 50%;
 		transform: translateX(-50%);
-		font-size: 0.8rem;
-		color: #6b7280;
+		font-size: 0.82rem;
+		color: $color-text-muted;
 		pointer-events: none;
+		background: rgba(0, 0, 0, 0.6);
+		backdrop-filter: blur(12px);
+		padding: 0.3rem 0.85rem;
+		border-radius: 9999px;
+		border: 1px solid rgba(255, 255, 255, 0.08);
 	}
-	.btn {
-		padding: 0.55rem 1.4rem;
-		font-size: 0.85rem;
-		font-weight: 600;
-		border: none;
-		border-radius: 8px;
-		background: #4f46e5;
-		color: #fff;
-		cursor: pointer;
-		transition: opacity 0.15s;
-	}
-	.btn:hover { opacity: 0.9; }
-	.btn:disabled { opacity: 0.4; cursor: not-allowed; }
-	.btn.outline {
-		background: transparent;
-		border: 2px solid #4f46e5;
-		color: #4f46e5;
-	}
-	.btn.outline:hover {
-		background: #4f46e5;
-		color: #fff;
-	}
-	.btn-sm {
-		padding: 0.4rem 1rem;
-		font-size: 0.8rem;
-		font-weight: 600;
-		border: 1px solid #4b5563;
-		border-radius: 6px;
-		background: transparent;
-		color: #9ca3af;
-		cursor: pointer;
-		transition: all 0.15s;
-	}
-	.btn-sm:hover {
-		border-color: #4f46e5;
-		color: #4f46e5;
-	}
+
 	.loading {
 		flex: 1;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		color: #6b7280;
+		color: $color-text-muted;
 		font-size: 1rem;
+		font-weight: 500;
 	}
 	.loading.error {
-		color: #ef4444;
+		color: $color-danger;
 	}
 	.toast {
 		position: absolute;
-		top: 1rem;
+		top: 1.25rem;
 		left: 50%;
 		transform: translateX(-50%);
-		padding: 0.7rem 1.5rem;
-		border-radius: 10px;
+		padding: 0.65rem 1.6rem;
+		border-radius: 9999px;
 		font-size: 0.9rem;
 		font-weight: 600;
+		letter-spacing: -0.01em;
 		z-index: 20;
-		animation: toast-in 0.2s ease-out;
+		box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+		animation: toast-in 0.25s $ease-spring;
 	}
 	.toast.success {
-		background: #16a34a;
-		color: #fff;
+		background: #30d158;
+		color: #ffffff;
 	}
 	.toast.error {
-		background: #dc2626;
-		color: #fff;
+		background: $color-danger;
+		color: #ffffff;
 	}
 	@keyframes toast-in {
-		from { opacity: 0; transform: translateX(-50%) translateY(-8px); }
-		to { opacity: 1; transform: translateX(-50%) translateY(0); }
+		from { opacity: 0; transform: translateX(-50%) translateY(-10px) scale(0.95); }
+		to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
 	}
 
 	.paper-btn {
 		position: absolute;
-		bottom: 1rem;
-		right: 1rem;
-		padding: 0.55rem 1.4rem;
+		bottom: 1.25rem;
+		right: 1.25rem;
+		padding: 0.6rem 1.4rem;
 		font-size: 0.85rem;
 		font-weight: 600;
-		border: none;
-		border-radius: 8px;
-		background: #4f46e5;
-		color: #fff;
+		border: 1px solid rgba(255, 255, 255, 0.15);
+		border-radius: 9999px;
+		background: rgba(255, 255, 255, 0.08);
+		backdrop-filter: blur(16px);
+		-webkit-backdrop-filter: blur(16px);
+		color: #ffffff;
 		cursor: pointer;
 		z-index: 10;
-		transition: opacity 0.15s;
+		transition: all 0.2s $ease-apple;
+		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
 	}
-	.paper-btn:hover { opacity: 0.9; }
+	.paper-btn:hover {
+		background: rgba(255, 255, 255, 0.16);
+		transform: scale(1.03);
+	}
+	.paper-btn:active {
+		transform: scale(0.95);
+	}
 
 	.paper-label-bot {
 		position: absolute;
-		bottom: 1rem;
-		left: 1rem;
-		font-size: 0.75rem;
-		color: #6b7280;
+		bottom: 1.25rem;
+		left: 1.25rem;
+		font-size: 0.78rem;
+		color: $color-text-muted;
 		z-index: 10;
+		background: rgba(0, 0, 0, 0.5);
+		backdrop-filter: blur(12px);
+		padding: 0.25rem 0.75rem;
+		border-radius: 9999px;
+		border: 1px solid rgba(255, 255, 255, 0.08);
 	}
 
 	.modal-overlay {
 		position: absolute;
 		inset: 0;
-		background: rgba(0,0,0,0.7);
+		background: rgba(0, 0, 0, 0.65);
+		backdrop-filter: blur(20px);
+		-webkit-backdrop-filter: blur(20px);
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		z-index: 30;
-		animation: fade-in 0.15s ease-out;
+		animation: fade-in 0.2s $ease-apple;
 	}
 	@keyframes fade-in {
 		from { opacity: 0; }
 		to { opacity: 1; }
 	}
 	.modal-panel {
-		background: #1f2937;
-		border-radius: 16px;
-		padding: 1.75rem;
+		background: rgba(30, 41, 59, 0.55);
+		backdrop-filter: blur(40px) saturate(200%);
+		-webkit-backdrop-filter: blur(40px) saturate(200%);
+		border: 1px solid rgba(255, 255, 255, 0.18);
+		border-radius: 24px;
+		padding: 1.85rem;
 		max-width: 580px;
 		width: 92%;
 		box-sizing: border-box;
-		animation: modal-in 0.2s ease-out;
+		box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12), 0 20px 40px rgba(0, 0, 0, 0.5);
+		animation: modal-in 0.25s $ease-spring;
 	}
 	@keyframes modal-in {
-		from { opacity: 0; transform: scale(0.95); }
+		from { opacity: 0; transform: scale(0.94); }
 		to { opacity: 1; transform: scale(1); }
 	}
 	.modal-header {
@@ -726,21 +729,31 @@
 	}
 	.modal-header h3 {
 		margin: 0;
-		font-size: 1.1rem;
-		color: #fff;
+		font-size: 1.2rem;
+		font-weight: 700;
+		letter-spacing: -0.02em;
+		color: #ffffff;
 	}
 	.modal-close {
-		background: none;
+		background: rgba(255, 255, 255, 0.1);
 		border: none;
-		color: #6b7280;
+		color: $color-text-muted;
 		cursor: pointer;
-		padding: 0.25rem;
-		border-radius: 6px;
-		transition: all 0.15s;
+		width: 30px;
+		height: 30px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		border-radius: 50%;
+		transition: all 0.18s $ease-apple;
 	}
 	.modal-close:hover {
-		color: #fff;
-		background: rgba(255,255,255,0.08);
+		color: #ffffff;
+		background: rgba(255, 255, 255, 0.2);
+		transform: scale(1.05);
+	}
+	.modal-close:active {
+		transform: scale(0.92);
 	}
 
 	.paper-options {
@@ -753,23 +766,30 @@
 		flex-direction: column;
 		align-items: center;
 		justify-content: space-between;
-		border: 2px solid rgba(255,255,255,0.08);
-		border-radius: 12px;
-		background: transparent;
+		border: 1px solid rgba(255, 255, 255, 0.1);
+		border-radius: 16px;
+		background: rgba(255, 255, 255, 0.04);
 		padding: 1rem 0.75rem;
 		cursor: pointer;
-		transition: all 0.15s;
+		transition: all 0.2s $ease-apple;
 		text-align: center;
-		color: #9ca3af;
+		color: $color-text-muted;
 		box-sizing: border-box;
+		user-select: none;
 	}
 	.paper-card:hover {
-		border-color: rgba(255,255,255,0.2);
+		border-color: rgba(255, 255, 255, 0.22);
+		background: rgba(255, 255, 255, 0.07);
+		transform: translateY(-2px);
+	}
+	.paper-card:active {
+		transform: scale(0.96);
 	}
 	.paper-card.selected {
-		border-color: #4f46e5;
-		background: rgba(79,70,229,0.1);
-		color: #fff;
+		border-color: $color-primary;
+		background: rgba(10, 132, 255, 0.15);
+		color: #ffffff;
+		box-shadow: 0 4px 16px rgba(10, 132, 255, 0.25);
 	}
 	.paper-preview-wrap {
 		width: 100%;
@@ -780,12 +800,12 @@
 		margin-bottom: 0.75rem;
 	}
 	.paper-preview {
-		border: 1.5px dashed rgba(255,255,255,0.15);
-		border-radius: 6px;
+		border: 1.5px dashed rgba(255, 255, 255, 0.2);
+		border-radius: 8px;
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		background: rgba(255,255,255,0.03);
+		background: rgba(255, 255, 255, 0.04);
 		max-height: 100%;
 		max-width: 100%;
 		width: auto;
@@ -800,18 +820,20 @@
 		font-size: 0.75rem;
 		font-weight: 700;
 		color: inherit;
-		opacity: 0.6;
+		opacity: 0.65;
 	}
 	.paper-name {
 		display: block;
-		font-size: 0.9rem;
+		font-size: 0.92rem;
 		font-weight: 600;
+		letter-spacing: -0.01em;
 		color: inherit;
 	}
 	.paper-dims {
 		display: block;
 		font-size: 0.75rem;
-		color: #6b7280;
+		color: $color-text-muted;
 		margin-top: 0.2rem;
 	}
 </style>
+

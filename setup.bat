@@ -23,21 +23,22 @@ if errorlevel 1 (
 echo [v] Hak admin terkonfirmasi
 echo.
 
-:: == 1. Node.js ==
-echo [1/6] Node.js...
-where node >nul 2>&1
+:: == 1. Bun ==
+echo [1/6] Bun...
+where bun >nul 2>&1
 if errorlevel 1 (
     echo     [!] Belum ada, menginstall via winget...
-    winget install --id OpenJS.NodeJS.LTS -e --silent --accept-package-agreements --accept-source-agreements
+    winget install --id Oven-sh.Bun -e --silent --accept-package-agreements --accept-source-agreements
     if errorlevel 1 (
-        echo     [x] Gagal install Node.js
+        echo     [x] Gagal install Bun
         set "FAIL=1"
     )
 ) else (
-    for /f "delims=" %%v in ('node -v 2^>nul') do set "NODE_VER=%%v"
-    echo     [v] Sudah terinstall: !NODE_VER!
+    for /f "delims=" %%v in ('bun -v 2^>nul') do set "BUN_VER=%%v"
+    echo     [v] Sudah terinstall: !BUN_VER!
 )
-set "PATH=%ProgramFiles%\nodejs;%LocalAppData%\Programs\nodejs;%PATH%"
+:: Pastikan bun masuk ke session PATH saat ini (berguna jika baru saja diinstall)
+set "PATH=%USERPROFILE%\.bun\bin;%PATH%"
 echo.
 
 :: == 2. Git ==
@@ -121,7 +122,7 @@ echo.
 echo [6/6] Kamera ^& driver USB (WinUSB)...
 echo     [i] Pastikan kamera sudah ON dan terkoneksi USB
 echo     [i] Kalau gagal otomatis, Zadig akan didownload & dibuka
-node scripts/check-camera.cjs
+bun run scripts/check-camera.cjs
 echo.
 
 :: == Summary ==

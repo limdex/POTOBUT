@@ -4,14 +4,14 @@
 	"version": "0.0.1",
 	"type": "module",
 	"scripts": {
-		"dev": "node scripts/check-camera.cjs && vite dev",
+		"dev": "bun scripts/check-camera.cjs && vite dev",
 		"build": "vite build",
-		"preview": "node scripts/check-camera.cjs && node build",
+		"preview": "bun scripts/check-camera.cjs && bun build",
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
-		"check:camera": "node scripts/check-camera.cjs",
-		"check:printer": "node scripts/check-printer.cjs"
+		"check:camera": "bun scripts/check-camera.cjs",
+		"check:printer": "bun scripts/check-printer.cjs"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-auto": "^7.0.1",
@@ -20,6 +20,7 @@
 		"@sveltejs/vite-plugin-svelte": "^7.1.2",
 		"@types/better-sqlite3": "^7.6.13",
 		"@types/node": "^26.0.1",
+		"sass": "^1.103.1",
 		"svelte": "^5.56.1",
 		"svelte-check": "^4.6.0",
 		"typescript": "^6.0.3",
