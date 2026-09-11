@@ -215,22 +215,7 @@
 		const pos = canvasPos(e);
 		const idx = slotAtPos(pos);
 		if (idx === null) {
-			if (!selectedPaper) {
-				selectedSlot = null;
-				scheduleDraw();
-				return;
-			}
-			const pt = getPaperTransform();
-			const rect = canvasEl!.getBoundingClientRect();
-			const sx = pt.paperW / rect.width;
-			const sy = pt.paperH / rect.height;
 			selectedSlot = null;
-			dragging = true;
-			dragStartX = (e.clientX - rect.left) * sx;
-			dragStartY = (e.clientY - rect.top) * sy;
-			dragStartOffX = templateOffX;
-			dragStartOffY = templateOffY;
-			canvasEl!.setPointerCapture(e.pointerId);
 			scheduleDraw();
 			return;
 		}
@@ -247,26 +232,15 @@
 
 	function handlePointerMove(e: PointerEvent) {
 		if (!dragging) return;
-		if (selectedSlot === null) {
-			if (!selectedPaper) return;
-			const pt = getPaperTransform();
-			const rect = canvasEl!.getBoundingClientRect();
-			const sx = pt.paperW / rect.width;
-			const sy = pt.paperH / rect.height;
-			const px = (e.clientX - rect.left) * sx;
-			const py = (e.clientY - rect.top) * sy;
-			templateOffX = dragStartOffX + (px - dragStartX);
-			templateOffY = dragStartOffY + (py - dragStartY);
-		} else {
-			const pos = canvasPos(e);
-			const dx = pos.x - dragStartX;
-			const dy = pos.y - dragStartY;
-			const t = transforms[selectedSlot];
-			const maxX = (slots[selectedSlot].width * t.scale - slots[selectedSlot].width) / 2;
-			const maxY = (slots[selectedSlot].height * t.scale - slots[selectedSlot].height) / 2;
-			t.offsetX = Math.max(-maxX, Math.min(maxX, dragStartOffX + dx));
-			t.offsetY = Math.max(-maxY, Math.min(maxY, dragStartOffY + dy));
-		}
+		if (selectedSlot === null) return;
+		const pos = canvasPos(e);
+		const dx = pos.x - dragStartX;
+		const dy = pos.y - dragStartY;
+		const t = transforms[selectedSlot];
+		const maxX = (slots[selectedSlot].width * t.scale - slots[selectedSlot].width) / 2;
+		const maxY = (slots[selectedSlot].height * t.scale - slots[selectedSlot].height) / 2;
+		t.offsetX = Math.max(-maxX, Math.min(maxX, dragStartOffX - dx));
+		t.offsetY = Math.max(-maxY, Math.min(maxY, dragStartOffY - dy));
 		scheduleDraw();
 	}
 
@@ -650,8 +624,8 @@
 
 	.paper-btn {
 		position: absolute;
-		bottom: 1.25rem;
-		right: 1.25rem;
+		top: 1.25rem;
+		left: 1.25rem;
 		padding: 0.6rem 1.4rem;
 		font-size: 0.85rem;
 		font-weight: 600;
