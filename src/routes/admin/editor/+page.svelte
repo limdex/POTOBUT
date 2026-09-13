@@ -25,6 +25,9 @@
 	let layerPulsingId = $state<string | null>(null);
 	let pulseTimer: ReturnType<typeof setTimeout> | undefined;
 
+	let isNewTemplate = !initialTemplate || (initialTemplate.id === 0 && !initialTemplate.background_path && !initialTemplate.canvas_width);
+	let showNewTemplateModal = $state(isNewTemplate);
+
 	let activeGuides = $state<{ type: 'h' | 'v'; pos: number }[]>([]);
 
 	interface CanvasPreset {
@@ -39,6 +42,7 @@
 	$effect(() => {
 		if (browser) {
 			fetchPresets();
+			fetchSlotPresets();
 		}
 	});
 
@@ -81,6 +85,52 @@
 		} catch {}
 	}
 
+	interface SlotPreset {
+		id: number;
+		name: string;
+		width: number;
+		height: number;
+	}
+	let slotPresets = $state<SlotPreset[]>([]);
+
+	async function fetchSlotPresets() {
+		try {
+			const res = await fetch('/api/slot-presets');
+			if (res.ok) {
+				slotPresets = await res.json();
+			}
+		} catch {}
+	}
+
+	async function addSlotPreset(w: number, h: number) {
+		if (slotPresets.length >= 10) return;
+		try {
+			const res = await fetch('/api/slot-presets', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ width: w, height: h })
+			});
+			if (res.ok) {
+				const created = await res.json();
+				slotPresets = [...slotPresets, created];
+			}
+		} catch {}
+	}
+
+	async function removeSlotPreset(id: number) {
+		try {
+			const res = await fetch(`/api/slot-presets/${id}`, { method: 'DELETE' });
+			if (res.ok) {
+				slotPresets = slotPresets.filter(p => p.id !== id);
+			}
+		} catch {}
+	}
+
+	function applySlotPreset(idx: number, preset: SlotPreset) {
+		updateSlotPos(idx, 'width', preset.width);
+		updateSlotPos(idx, 'height', preset.height);
+	}
+
 	function triggerLayerPulse(id: string) {
 		layerPulsingId = id;
 		if (pulseTimer) clearTimeout(pulseTimer);
@@ -93,19 +143,11 @@
 	let bgNaturalHeight = $state(0);
 	let bgOffsetX = $state(initialTemplate?.bg_offset_x ?? 0);
 	let bgOffsetY = $state(initialTemplate?.bg_offset_y ?? 0);
+	let bgRotation = $state(initialTemplate?.bg_rotation ?? 0);
 
 	let bgCoverStyle = $derived.by(() => {
-		if (!backgroundPath || !bgNaturalWidth || !bgNaturalHeight || !canvasWidth || !canvasHeight) return '';
-		const s = Math.max(canvasWidth / bgNaturalWidth, canvasHeight / bgNaturalHeight);
-		const w = Math.round(bgNaturalWidth * s);
-		const h = Math.round(bgNaturalHeight * s);
-		const maxDx = Math.max(0, (w - canvasWidth) / 2);
-		const maxDy = Math.max(0, (h - canvasHeight) / 2);
-		const ox = Math.max(-maxDx, Math.min(maxDx, bgOffsetX));
-		const oy = Math.max(-maxDy, Math.min(maxDy, bgOffsetY));
-		const left = Math.round((canvasWidth - w) / 2 + ox);
-		const top = Math.round((canvasHeight - h) / 2 + oy);
-		return `position: absolute; width: ${w}px; height: ${h}px; left: ${left}px; top: ${top}px;`;
+		if (!backgroundPath || !canvasWidth || !canvasHeight) return '';
+		return `position: absolute; width: ${canvasWidth}px; height: ${canvasHeight}px; left: ${bgOffsetX}px; top: ${bgOffsetY}px; transform: rotate(${bgRotation}deg); transform-origin: center center;`;
 	});
 
 	$effect(() => {
@@ -626,7 +668,8 @@
 			slots,
 			overlays,
 			bg_offset_x: Math.round(bgOffsetX),
-			bg_offset_y: Math.round(bgOffsetY)
+			bg_offset_y: Math.round(bgOffsetY),
+			bg_rotation: Math.round(bgRotation)
 		};
 
 		let res;
@@ -681,6 +724,29 @@
 <svelte:window onkeydown={handleKeydown} />
 
 <div class="editor-page">
+	{#if showNewTemplateModal}
+		<div class="modal-overlay">
+			<div class="modal-content">
+				<h2>Pilih Ukuran Kertas</h2>
+				<p>Pilih ukuran kanvas untuk memulai desain template baru.</p>
+				<div class="modal-options">
+					<button onclick={() => { canvasWidth = 2480; canvasHeight = 3508; showNewTemplateModal = false; }}>
+						<span class="paper-name">A4</span>
+						<span class="paper-dim">21 × 29.7 cm</span>
+					</button>
+					<button onclick={() => { canvasWidth = 1204; canvasHeight = 1795; showNewTemplateModal = false; }}>
+						<span class="paper-name">4R</span>
+						<span class="paper-dim">10.2 × 15.2 cm</span>
+					</button>
+					<button class="outline" onclick={() => { showNewTemplateModal = false; }}>
+						<span class="paper-name">Bebas (Custom)</span>
+						<span class="paper-dim">Mulai dari kanvas kosong</span>
+					</button>
+				</div>
+			</div>
+		</div>
+	{/if}
+
 	<div class="topbar">
 		<button class="back-btn" onclick={() => goto('/admin')}>← Kembali</button>
 		<input class="name-input" type="text" bind:value={name} placeholder="Nama template" />
@@ -848,10 +914,10 @@
 					<h3>{isSlot ? 'Slot ' + (idx + 1) : 'Overlay'}</h3>
 					{#if isSlot && idx >= 0}
 						{@const s = slots[idx]}
-						<label>X <input type="number" value={Math.round(s.x)} oninput={(e) => updateSlotPos(idx, 'x', parseInt((e.target as HTMLInputElement).value) || 0)} /></label>
-						<label>Y <input type="number" value={Math.round(s.y)} oninput={(e) => updateSlotPos(idx, 'y', parseInt((e.target as HTMLInputElement).value) || 0)} /></label>
-						<label>W <input type="number" value={Math.round(s.width)} oninput={(e) => updateSlotPos(idx, 'width', parseInt((e.target as HTMLInputElement).value) || 50)} /></label>
-						<label>H <input type="number" value={Math.round(s.height)} oninput={(e) => updateSlotPos(idx, 'height', parseInt((e.target as HTMLInputElement).value) || 50)} /></label>
+						<label>X (cm) <input type="number" step="0.1" value={+(s.x / 118.11).toFixed(2)} oninput={(e) => updateSlotPos(idx, 'x', Math.round(parseFloat((e.target as HTMLInputElement).value) * 118.11) || 0)} /></label>
+						<label>Y (cm) <input type="number" step="0.1" value={+(s.y / 118.11).toFixed(2)} oninput={(e) => updateSlotPos(idx, 'y', Math.round(parseFloat((e.target as HTMLInputElement).value) * 118.11) || 0)} /></label>
+						<label>W (cm) <input type="number" step="0.1" value={+(s.width / 118.11).toFixed(2)} oninput={(e) => updateSlotPos(idx, 'width', Math.round(parseFloat((e.target as HTMLInputElement).value) * 118.11) || 50)} /></label>
+						<label>H (cm) <input type="number" step="0.1" value={+(s.height / 118.11).toFixed(2)} oninput={(e) => updateSlotPos(idx, 'height', Math.round(parseFloat((e.target as HTMLInputElement).value) * 118.11) || 50)} /></label>
 						<button
 							class="sidebar-action-btn"
 							onclick={duplicateSelectedSlot}
@@ -860,12 +926,46 @@
 							<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
 							Duplikat Slot
 						</button>
+
+						<div class="sidebar-section preset-section">
+							<h3>Default Ukuran Slot</h3>
+							{#if slotPresets.length > 0}
+								<div class="preset-list">
+									{#each slotPresets as preset}
+										<div class="preset-item">
+											<button
+												class="preset-apply-btn"
+												onclick={() => applySlotPreset(idx, preset)}
+												title="Gunakan {preset.name}"
+											>
+												<span class="preset-title">{preset.name}</span>
+												<span class="preset-dim">{+(preset.width / 118.11).toFixed(2)} × {+(preset.height / 118.11).toFixed(2)} cm</span>
+											</button>
+											<button
+												class="preset-del-btn"
+												onclick={() => removeSlotPreset(preset.id)}
+												title="Hapus default"
+											>
+												×
+											</button>
+										</div>
+									{/each}
+								</div>
+							{/if}
+							<button
+								class="add-preset-btn"
+								onclick={() => addSlotPreset(s.width, s.height)}
+								disabled={slotPresets.length >= 10}
+							>
+								+ Simpan Ukuran Slot ({slotPresets.length}/10)
+							</button>
+						</div>
 					{:else if ov}
-						<label>X <input type="number" value={Math.round(ov.x)} oninput={(e) => updateOverlay('x', parseInt((e.target as HTMLInputElement).value) || 0)} /></label>
-						<label>Y <input type="number" value={Math.round(ov.y)} oninput={(e) => updateOverlay('y', parseInt((e.target as HTMLInputElement).value) || 0)} /></label>
-						<label>W <input type="number" value={Math.round(ov.width)} oninput={(e) => updateOverlay('width', parseInt((e.target as HTMLInputElement).value) || 50)} /></label>
-						<label>H <input type="number" value={Math.round(ov.height)} oninput={(e) => updateOverlay('height', parseInt((e.target as HTMLInputElement).value) || 50)} /></label>
-						<label>Rot <input type="number" value={ov.rotation} oninput={(e) => updateOverlay('rotation', parseFloat((e.target as HTMLInputElement).value) || 0)} /></label>
+						<label>X (cm) <input type="number" step="0.1" value={+(ov.x / 118.11).toFixed(2)} oninput={(e) => updateOverlay('x', Math.round(parseFloat((e.target as HTMLInputElement).value) * 118.11) || 0)} /></label>
+						<label>Y (cm) <input type="number" step="0.1" value={+(ov.y / 118.11).toFixed(2)} oninput={(e) => updateOverlay('y', Math.round(parseFloat((e.target as HTMLInputElement).value) * 118.11) || 0)} /></label>
+						<label>W (cm) <input type="number" step="0.1" value={+(ov.width / 118.11).toFixed(2)} oninput={(e) => updateOverlay('width', Math.round(parseFloat((e.target as HTMLInputElement).value) * 118.11) || 50)} /></label>
+						<label>H (cm) <input type="number" step="0.1" value={+(ov.height / 118.11).toFixed(2)} oninput={(e) => updateOverlay('height', Math.round(parseFloat((e.target as HTMLInputElement).value) * 118.11) || 50)} /></label>
+						<label>Rotasi <input type="number" value={ov.rotation} oninput={(e) => updateOverlay('rotation', parseFloat((e.target as HTMLInputElement).value) || 0)} /></label>
 					{/if}
 
 					<div class="layer-section">
@@ -893,9 +993,15 @@
 			{:else}
 				{#if canvasWidth > 0}
 					<div class="sidebar-section">
-						<h3>Canvas (px)</h3>
-						<label>W (px) <input type="number" bind:value={canvasWidth} min="1" /></label>
-						<label>H (px) <input type="number" bind:value={canvasHeight} min="1" /></label>
+						<h3>Canvas (cm)</h3>
+						<label>W (cm) <input type="number" step="0.1" value={+(canvasWidth / 118.11).toFixed(2)} oninput={(e) => canvasWidth = Math.round(parseFloat((e.target as HTMLInputElement).value) * 118.11) || canvasWidth} min="0.1" /></label>
+						<label>H (cm) <input type="number" step="0.1" value={+(canvasHeight / 118.11).toFixed(2)} oninput={(e) => canvasHeight = Math.round(parseFloat((e.target as HTMLInputElement).value) * 118.11) || canvasHeight} min="0.1" /></label>
+					</div>
+					<div class="sidebar-section">
+						<h3>Background</h3>
+						<label>Rotasi <input type="number" bind:value={bgRotation} /></label>
+						<label>X (cm) <input type="number" step="0.1" value={+(bgOffsetX / 118.11).toFixed(2)} oninput={(e) => bgOffsetX = Math.round(parseFloat((e.target as HTMLInputElement).value) * 118.11) || 0} /></label>
+						<label>Y (cm) <input type="number" step="0.1" value={+(bgOffsetY / 118.11).toFixed(2)} oninput={(e) => bgOffsetY = Math.round(parseFloat((e.target as HTMLInputElement).value) * 118.11) || 0} /></label>
 					</div>
 				{/if}
 				<div class="sidebar-empty">Klik slot atau overlay untuk mengatur posisi</div>
@@ -1528,4 +1634,34 @@ flex: 1;
 		from { opacity: 0; transform: translateY(4px); }
 		to { opacity: 1; transform: translateY(0); }
 	}
+
+	.modal-overlay {
+		position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+		background: rgba(15, 23, 42, 0.8);
+		display: flex; align-items: center; justify-content: center;
+		z-index: 1000;
+		backdrop-filter: blur(8px);
+	}
+	.modal-content {
+		background: rgba(30, 41, 59, 0.95);
+		border: 1px solid rgba(255, 255, 255, 0.1);
+		padding: 2.5rem; border-radius: 20px; width: 440px;
+		text-align: center; color: #fff;
+		box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+	}
+	.modal-content h2 { margin-top: 0; margin-bottom: 0.5rem; font-size: 1.5rem; font-weight: 700; }
+	.modal-content p { color: $color-text-muted; margin-bottom: 2rem; font-size: 0.95rem; }
+	.modal-options { display: flex; flex-direction: column; gap: 0.85rem; }
+	.modal-options button {
+		background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1);
+		padding: 1rem; border-radius: 12px; color: #fff;
+		cursor: pointer; transition: all 0.2s;
+		display: flex; flex-direction: column; align-items: center; gap: 0.25rem;
+	}
+	.modal-options button:hover { background: rgba(10, 132, 255, 0.2); border-color: $color-primary; transform: translateY(-2px); }
+	.modal-options button:active { transform: translateY(0); }
+	.modal-options button.outline { background: transparent; border-style: dashed; }
+	.modal-options button.outline:hover { background: rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.3); }
+	.paper-name { font-weight: 600; font-size: 1.15rem; }
+	.paper-dim { font-size: 0.85rem; color: $color-text-muted; }
 </style>

@@ -29,7 +29,8 @@ export const PUT: RequestHandler = async ({ params, request }) => {
 			slots,
 			overlays,
 			bg_offset_x,
-			bg_offset_y
+			bg_offset_y,
+			bg_rotation
 		} = body;
 
 	const stmt = db.prepare(`
@@ -43,6 +44,7 @@ export const PUT: RequestHandler = async ({ params, request }) => {
 			overlays = COALESCE(?, overlays),
 			bg_offset_x = COALESCE(?, bg_offset_x),
 			bg_offset_y = COALESCE(?, bg_offset_y),
+			bg_rotation = COALESCE(?, bg_rotation),
 			updated_at = datetime('now')
 		WHERE id = ?
 	`);
@@ -56,6 +58,7 @@ export const PUT: RequestHandler = async ({ params, request }) => {
 		overlays ? JSON.stringify(overlays) : null,
 		bg_offset_x ?? null,
 		bg_offset_y ?? null,
+		bg_rotation ?? null,
 		Number(params.id)
 	);
 	invalidateTemplateCache(Number(params.id));

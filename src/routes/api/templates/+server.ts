@@ -26,12 +26,13 @@ export const POST: RequestHandler = async ({ request }) => {
 			slots = [] as Slot[],
 			overlays = [] as Overlay[],
 			bg_offset_x = 0,
-			bg_offset_y = 0
+			bg_offset_y = 0,
+			bg_rotation = 0
 		} = body;
 
 		const stmt = db.prepare(`
-			INSERT INTO templates (name, canvas_width, canvas_height, background_path, slot_count, slots, overlays, bg_offset_x, bg_offset_y)
-			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+			INSERT INTO templates (name, canvas_width, canvas_height, background_path, slot_count, slots, overlays, bg_offset_x, bg_offset_y, bg_rotation)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		`);
 		const result = stmt.run(
 			name,
@@ -42,7 +43,8 @@ export const POST: RequestHandler = async ({ request }) => {
 			JSON.stringify(slots),
 			JSON.stringify(overlays),
 			bg_offset_x,
-			bg_offset_y
+			bg_offset_y,
+			bg_rotation
 		);
 
 	const row = db.prepare('SELECT * FROM templates WHERE id = ?').get(result.lastInsertRowid) as TemplateDbRow;

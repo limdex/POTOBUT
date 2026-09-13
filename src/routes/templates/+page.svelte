@@ -35,7 +35,7 @@
 			<p>Belum ada template tersedia.</p>
 		</div>
 	{:else}
-		<div class="grid-responsive">
+		<div class="horizontal-scroll-container">
 			{#each data.templates as template (template.id)}
 				<div
 					class="card"
@@ -68,6 +68,40 @@
 
 <style lang="scss">
 	@use '../../styles/variables' as *;
+
+	.horizontal-scroll-container {
+		display: flex;
+		flex-wrap: nowrap;
+		overflow-x: auto;
+		gap: 1.5rem;
+		padding-bottom: 1rem;
+		scroll-snap-type: x mandatory;
+		scroll-behavior: smooth;
+		-webkit-overflow-scrolling: touch;
+		
+		/* Custom scrollbar for better look */
+		&::-webkit-scrollbar {
+			height: 8px;
+		}
+		&::-webkit-scrollbar-track {
+			background: rgba(255, 255, 255, 0.05);
+			border-radius: 4px;
+		}
+		&::-webkit-scrollbar-thumb {
+			background: rgba(255, 255, 255, 0.2);
+			border-radius: 4px;
+			&:hover {
+				background: rgba(255, 255, 255, 0.3);
+			}
+		}
+
+		/* Optional: snap to elements */
+		> * {
+			scroll-snap-align: start;
+			flex: 0 0 auto;
+			width: 280px; /* Force card width so it scrolls */
+		}
+	}
 
 	.top-nav {
 		margin-bottom: 0.5rem;

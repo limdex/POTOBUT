@@ -40,6 +40,7 @@ function initSchema() {
 			overlays TEXT NOT NULL DEFAULT '[]',
 			bg_offset_x INTEGER NOT NULL DEFAULT 0,
 			bg_offset_y INTEGER NOT NULL DEFAULT 0,
+			bg_rotation INTEGER NOT NULL DEFAULT 0,
 			created_at TEXT NOT NULL DEFAULT (datetime('now')),
 			updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 		)
@@ -51,6 +52,9 @@ function initSchema() {
 	try {
 		db.exec('ALTER TABLE templates ADD COLUMN bg_offset_y INTEGER NOT NULL DEFAULT 0');
 	} catch {}
+	try {
+		db.exec('ALTER TABLE templates ADD COLUMN bg_rotation INTEGER NOT NULL DEFAULT 0');
+	} catch {}
 
 	db.exec(`
 		CREATE TABLE IF NOT EXISTS canvas_presets (
@@ -61,9 +65,27 @@ function initSchema() {
 			created_at TEXT NOT NULL DEFAULT (datetime('now'))
 		)
 	`);
+
+	db.exec(`
+		CREATE TABLE IF NOT EXISTS slot_presets (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			name TEXT NOT NULL,
+			width INTEGER NOT NULL,
+			height INTEGER NOT NULL,
+			created_at TEXT NOT NULL DEFAULT (datetime('now'))
+		)
+	`);
 }
 
 export interface CanvasPresetRecord {
+	id: number;
+	name: string;
+	width: number;
+	height: number;
+	created_at: string;
+}
+
+export interface SlotPresetRecord {
 	id: number;
 	name: string;
 	width: number;
@@ -91,6 +113,29 @@ export function addCanvasPresetDb(width: number, height: number): CanvasPresetRe
 export function deleteCanvasPresetDb(id: number): boolean {
 	const db = getDb();
 	const info = db.prepare('DELETE FROM canvas_presets WHERE id = ?').run(id);
+	return info.changes > 0;
+}
+
+export function getAllSlotPresets(): SlotPresetRecord[] {
+	const db = getDb();
+	return db.prepare('SELECT * FROM slot_presets ORDER BY id ASC').all() as SlotPresetRecord[];
+}
+
+export function addSlotPresetDb(width: number, height: number): SlotPresetRecord | null {
+	const db = getDb();
+	const countRow = db.prepare('SELECT COUNT(*) as count FROM slot_presets').get() as { count: number };
+	if (countRow.count >= 10) return null;
+
+	const nextNum = countRow.count + 1;
+	const name = `Slot ${nextNum}`;
+
+	const info = db.prepare('INSERT INTO slot_presets (name, width, height) VALUES (?, ?, ?)').run(name, width, height);
+	return db.prepare('SELECT * FROM slot_presets WHERE id = ?').get(info.lastInsertRowid) as SlotPresetRecord;
+}
+
+export function deleteSlotPresetDb(id: number): boolean {
+	const db = getDb();
+	const info = db.prepare('DELETE FROM slot_presets WHERE id = ?').run(id);
 	return info.changes > 0;
 }
 

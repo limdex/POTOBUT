@@ -26,6 +26,7 @@ export interface TemplateRecord {
 	overlays: Overlay[];
 	bg_offset_x: number;
 	bg_offset_y: number;
+	bg_rotation: number;
 	created_at: string;
 	updated_at: string;
 }
@@ -41,6 +42,7 @@ export interface TemplateDbRow {
 	overlays: string;
 	bg_offset_x: number;
 	bg_offset_y: number;
+	bg_rotation: number;
 	created_at: string;
 	updated_at: string;
 }
