@@ -206,8 +206,10 @@
 
 			const img = new Image();
 			img.onload = () => {
-				canvasWidth = img.naturalWidth;
-				canvasHeight = img.naturalHeight;
+				if (!canvasWidth || !canvasHeight) {
+					canvasWidth = img.naturalWidth;
+					canvasHeight = img.naturalHeight;
+				}
 			};
 			img.src = data.path;
 		};
